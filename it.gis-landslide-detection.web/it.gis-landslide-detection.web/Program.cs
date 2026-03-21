@@ -20,6 +20,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+builder.Services.AddScoped<IIffiService, IffiService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevPolicy", policy =>

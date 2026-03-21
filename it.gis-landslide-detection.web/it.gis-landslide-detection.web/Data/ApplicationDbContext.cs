@@ -11,8 +11,19 @@ namespace it.gis_landslide_detection.web.Data
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            
+            //modelBuilder.Entity<HikingPoint>().Property(h => h.Geom)
+            //    .HasColumnType("geometry");
             modelBuilder.Entity<HikingPoint>().ToTable("hiking_points");
-            modelBuilder.Entity<HikingPoint>().Property(h => h.Geom)
+            //base.OnModelCreating(modelBuilder);
+            //modelBuilder.HasPostgresExtension("postgis");
+
+            modelBuilder.Entity<HikingPoint>()
+                .Property(h => h.Geom)
+                .HasColumnType("geometry");
+
+            modelBuilder.Entity<IffiZone>()
+                .Property(z => z.Geom)
                 .HasColumnType("geometry");
         }
 
@@ -21,5 +32,7 @@ namespace it.gis_landslide_detection.web.Data
         }
 
         public DbSet<HikingPoint> HikingPoints { get; set; }
+
+        public DbSet<IffiZone> IffiZones { get; set; }
     }
 }
