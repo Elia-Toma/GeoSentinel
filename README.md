@@ -20,10 +20,10 @@ IFFI Records — Historical Italian Landslide Inventory data identifying high-ri
 
 Each trail is assigned one of three states, updated in real time:
 
- State  |  Indicator  |         Meaning
- Safe   |  Green      | Standard conditions. Trail is clear.
- Caution|  Orange     | Elevated risk due to recent rainfall or soil saturation.
- Danger |  Red        |High-risk zone. Animated markers indicate immediate hazard.
+    State  |  Indicator  |         Meaning
+    Safe   |  Green      | Standard conditions. Trail is clear.
+    Caution|  Orange     | Elevated risk due to recent rainfall or soil saturation.
+    Danger |  Red        |High-risk zone. Animated markers indicate immediate hazard.
 
 
 Clicking any trail segment opens a popup with granular details: rainfall intensity, soil moisture readings, and the historical IFFI risk classification for that zone.
