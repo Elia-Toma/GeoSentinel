@@ -1,5 +1,7 @@
 using it.gis_landslide_detection.web.Models;
 using System.Text.Json;
+using System.Threading;
+using System.Linq;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace it.gis_landslide_detection.web.Services
@@ -9,6 +11,7 @@ namespace it.gis_landslide_detection.web.Services
         private readonly IHttpClientFactory _factory;
         private readonly ILogger<WeatherService> _log;
         private readonly IMemoryCache _cache;
+        private static readonly SemaphoreSlim[] _shardedLocks = Enumerable.Range(0, 256).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
 
         public WeatherService(IHttpClientFactory factory,
                               ILogger<WeatherService> log,
@@ -29,8 +32,14 @@ namespace it.gis_landslide_detection.web.Services
                 return cachedData;
             }
 
+            var semaphore = _shardedLocks[Math.Abs(cacheKey.GetHashCode()) % 256];
+            await semaphore.WaitAsync();
+
             try
             {
+                if (_cache.TryGetValue(cacheKey, out cachedData))
+                    return cachedData;
+
                 var client = _factory.CreateClient("openmeteo");
                 
                 // Richiede precipitazioni attuali e 7 giorni passati
@@ -91,6 +100,10 @@ namespace it.gis_landslide_detection.web.Services
             {
                 _log.LogWarning("WeatherService API fallita: {msg}", ex.Message);
                 return null;
+            }
+            finally
+            {
+                semaphore.Release();
             }
         }
 

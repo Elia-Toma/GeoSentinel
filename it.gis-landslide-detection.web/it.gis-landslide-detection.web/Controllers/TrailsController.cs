@@ -1,10 +1,14 @@
-﻿// Controllers/TrailsController.cs
+// Controllers/TrailsController.cs
 using it.gis_landslide_detection.web.Data;
 using it.gis_landslide_detection.web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.IO;
+using System;
+using System.Linq;
+using System.Threading;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace it.gis_landslide_detection.web.Controllers
 {
@@ -18,8 +22,10 @@ namespace it.gis_landslide_detection.web.Controllers
         private readonly IWeatherService _weather;
         private readonly IHazardScoreEngine _hazardEngine;
         private readonly ILogger<TrailsController> _logger;
+        private readonly IMemoryCache _cache;
+        private static readonly SemaphoreSlim[] _shardedLocks = Enumerable.Range(0, 256).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
 
-        public TrailsController(ApplicationDbContext context, IIffiService iffiService, ISentinelService sentinelService, IWeatherService weatherService, IHazardScoreEngine hazardEngine, ILogger<TrailsController> logger)
+        public TrailsController(ApplicationDbContext context, IIffiService iffiService, ISentinelService sentinelService, IWeatherService weatherService, IHazardScoreEngine hazardEngine, ILogger<TrailsController> logger, IMemoryCache cache)
         {
             _context = context;
             _iffi = iffiService;
@@ -27,6 +33,7 @@ namespace it.gis_landslide_detection.web.Controllers
             _weather = weatherService;
             _hazardEngine = hazardEngine;
             _logger = logger;
+            _cache = cache;
         }
 
         /// <summary>
@@ -60,8 +67,22 @@ namespace it.gis_landslide_detection.web.Controllers
         [HttpGet("{id}/hazard")]
         public async Task<IActionResult> GetHazard(long id)
         {
+          string cacheKey = $"trail_hazard_{id}";
+          if (_cache.TryGetValue(cacheKey, out object? cachedResponse))
+          {
+              return Ok(cachedResponse);
+          }
+
+          var semaphore = _shardedLocks[Math.Abs(cacheKey.GetHashCode()) % 256];
+          await semaphore.WaitAsync();
+
           try
           {
+            if (_cache.TryGetValue(cacheKey, out cachedResponse))
+            {
+                return Ok(cachedResponse);
+            }
+
             // get punto critico lungo il trail
             var iffiResult = await _iffi.GetTrailHazardAsync(id);
             if (iffiResult == null)
@@ -106,7 +127,7 @@ namespace it.gis_landslide_detection.web.Controllers
             double hazardScore = Safe(hazard.HazardScore);
             histScore = Safe(histScore);
 
-            return Ok(new
+            var responseObj = new
             {
                 // Trail
                 TrailId = id,
@@ -146,12 +167,19 @@ namespace it.gis_landslide_detection.web.Controllers
                     SaturationFloorApplied = hazard.SaturationFloorApplied,
                     WeatherDataUnavailable = hazard.WeatherDataUnavailable
                 }
-            });
+            };
+
+            _cache.Set(cacheKey, responseObj, TimeSpan.FromMinutes(15));
+            return Ok(responseObj);
           }
           catch (Exception ex)
           {
               _logger.LogError(ex, "Errore nel calcolo della pericolosità per trail {TrailId}", id);
               return StatusCode(500, new { error = $"Errore interno nel calcolo della pericolosità per il trail {id}.", detail = ex.Message });
+          }
+          finally
+          {
+              semaphore.Release();
           }
         }
 
