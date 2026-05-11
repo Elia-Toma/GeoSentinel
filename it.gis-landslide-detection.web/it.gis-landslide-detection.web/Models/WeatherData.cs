@@ -1,5 +1,9 @@
+using System.Collections.Generic;
+
 namespace it.gis_landslide_detection.web.Models
 {
+    public record DailyPrecipitation(string Date, double PrecipitationMm);
+
     public record WeatherData 
     {
         public double PrecipitationMmh { get; set; }       // mm/h attuali
@@ -8,8 +12,9 @@ namespace it.gis_landslide_detection.web.Models
         public int    ApiScore { get; set; }               // API normalizzato 0-100
         public int    CurrentRainScore { get; set; }       // pioggia attuale normalizzata 0-100
         public string? Source { get; set; }
+        public List<DailyPrecipitation>? DailyHistory { get; set; }
 
-        public WeatherData(double precipitationMmh, double pastPrecipitationMm, double antecedentPrecipIndex, int apiScore, int currentRainScore, string? source)
+        public WeatherData(double precipitationMmh, double pastPrecipitationMm, double antecedentPrecipIndex, int apiScore, int currentRainScore, string? source, List<DailyPrecipitation>? dailyHistory = null)
         {
             PrecipitationMmh = precipitationMmh;
             PastPrecipitationMm = pastPrecipitationMm;
@@ -17,6 +22,7 @@ namespace it.gis_landslide_detection.web.Models
             ApiScore = apiScore;
             CurrentRainScore = currentRainScore;
             Source = source;
+            DailyHistory = dailyHistory;
         }
     }
 }

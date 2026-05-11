@@ -157,7 +157,14 @@ namespace it.gis_landslide_detection.web.Controllers
                         VvDb = Safe(Math.Round(vvDb, 2)), 
                         Source = sentinelSrc 
                     },
-                    AntecedentPrecip = new { Score = apiScore, Weight = Safe(Math.Round(hazard.WApi, 4)), ApiMm = Safe(Math.Round(apiMm, 2)), Days = 7, DecayK = 0.85 },
+                    AntecedentPrecip = new { 
+                        Score = apiScore, 
+                        Weight = Safe(Math.Round(hazard.WApi, 4)), 
+                        ApiMm = Safe(Math.Round(apiMm, 2)), 
+                        Days = 7, 
+                        DecayK = 0.85,
+                        DailyHistory = weather?.DailyHistory 
+                    },
                     CurrentRain = new { Score = currentRainScore, Weight = Safe(Math.Round(hazard.WRain, 4)), Mmh = Safe(Math.Round(precipMmh, 2)), Source = meteoSrc },
                     // Diagnostica formula
                     SaturationIndex = Safe(Math.Round(hazard.SaturationIndex, 2)),

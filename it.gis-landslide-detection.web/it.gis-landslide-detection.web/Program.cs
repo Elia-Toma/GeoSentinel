@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using it.gis_landslide_detection.web.Data;
 using it.gis_landslide_detection.web.Services;
@@ -54,7 +54,7 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddHttpClient("openmeteo", client =>
 {
     client.BaseAddress = new Uri("https://api.open-meteo.com");
-    client.Timeout = TimeSpan.FromSeconds(5);
+    client.Timeout = TimeSpan.FromSeconds(15);
 });
 
 builder.Services.AddHttpClient("copernicus", client =>
