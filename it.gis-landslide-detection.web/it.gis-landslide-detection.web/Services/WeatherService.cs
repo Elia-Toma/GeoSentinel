@@ -61,6 +61,8 @@ namespace it.gis_landslide_detection.web.Services
                 double pastPrecipitation = 0.0;
                 double antecedentPrecipIndex = 0.0;
                 const double k = 0.85; // decay coefficient
+                int offsetSeconds = doc.RootElement.TryGetProperty("utc_offset_seconds", out var offsetElem) ? offsetElem.GetInt32() : 0;
+                var utcOffset = TimeSpan.FromSeconds(offsetSeconds);
 
                 var dailyHistory = new List<DailyPrecipitation>();
                 if (doc.RootElement.TryGetProperty("daily", out var dailyElem) &&
@@ -68,24 +70,30 @@ namespace it.gis_landslide_detection.web.Services
                 {
                     var timeArray = dailyElem.TryGetProperty("time", out var tArr) ? tArr : default;
 
-                    // L'array ha ampiezza 8 (7 giorni passati + oggi). Prendiamo i primi 7 giorni.
-                    int count = Math.Min(7, precipArray.GetArrayLength());
+                    // Prendiamo tutti i giorni restituiti (solitamente 7 passati + oggi)
+                    int count = precipArray.GetArrayLength();
                     for (int i = 0; i < count; i++)
                     {
                         var val = precipArray[i];
                         if (val.ValueKind != JsonValueKind.Null)
                         {
                             double dailyMm = val.GetDouble();
-                            pastPrecipitation += dailyMm;
-                            // Ordine cronologico: indice 0 è 7 giorni fa.
-                            antecedentPrecipIndex = (k * antecedentPrecipIndex) + dailyMm;
+                            pastPrecipitation += (i < count - 1) ? dailyMm : 0; // Escludiamo oggi dal calcolo API antecedente se necessario, o includiamo tutto? 
+                            // Il calcolo originale faceva: antecedentPrecipIndex = (k * antecedentPrecipIndex) + dailyMm;
+                            // Ripristiniamo la logica originale di calcolo dell'indice ma fixiamo le date.
+                            
+                            if (i < count - 1) // Gli ultimi 7 giorni (escluso oggi) per l'indice antecedente
+                            {
+                                antecedentPrecipIndex = (k * antecedentPrecipIndex) + dailyMm;
+                            }
 
                             // Aggiunta allo storico
                             string dateStr = $"Day {i+1}";
                             if (timeArray.ValueKind == JsonValueKind.Array && i < timeArray.GetArrayLength())
                             {
                                 long unix = timeArray[i].GetInt64();
-                                dateStr = DateTimeOffset.FromUnixTimeSeconds(unix).ToString("yyyy-MM-dd");
+                                // Applichiamo l'offset locale per evitare l'errore del giorno precedente dovuto al fuso orario
+                                dateStr = DateTimeOffset.FromUnixTimeSeconds(unix).ToOffset(utcOffset).ToString("yyyy-MM-dd");
                             }
                             dailyHistory.Add(new DailyPrecipitation(dateStr, Math.Round(dailyMm, 1)));
                         }
