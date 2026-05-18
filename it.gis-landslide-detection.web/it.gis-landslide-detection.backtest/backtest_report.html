@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoSentinel - HazardScore Backtest Report</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                        },
+                        danger: '#ef4444',
+                        warning: '#f97316',
+                        safe: '#22c55e',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body {
+            background-color: #0b1120;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(15, 23, 42, 1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(30, 27, 75, 0.4) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(15, 23, 42, 1) 0px, transparent 50%),
+                radial-gradient(at 0% 100%, rgba(23, 37, 84, 0.3) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: #f8fafc;
+        }
+        
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -15px rgba(0,0,0,0.6);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(71, 85, 105, 1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 1);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-200 antialiased font-sans flex flex-col items-center">
+
+    <div class="w-full max-w-7xl px-4 py-8 md:py-12">
+        <!-- Header -->
+        <header class="mb-10 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+                <h1 class="text-3xl md:text-5xl font-bold tracking-tight text-white mb-2">
+                    <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">HazardScore</span> Backtest
+                </h1>
+                <p class="text-slate-400 text-lg max-w-2xl">
+                    Validazione scientifica dell'algoritmo matematico su 7 scenari storici di eventi catastrofici italiani e 1 caso di controllo.
+                </p>
+            </div>
+            
+            <div class="glass-panel px-6 py-4 rounded-2xl flex items-center gap-6">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-white">8/8</div>
+                    <div class="text-xs text-slate-400 uppercase tracking-wider font-semibold mt-1">Test Passati</div>
+                </div>
+                <div class="w-px h-10 bg-slate-700"></div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-400">100%</div>
+                    <div class="text-xs text-slate-400 uppercase tracking-wider font-semibold mt-1">Accuratezza</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Chart -->
+        <div class="glass-panel rounded-3xl p-6 md:p-8 mb-10 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+            </div>
+            
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                    Analisi Parametrica Eventi
+                </h2>
+                <div class="flex gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span> CRITICAL
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                        <span class="w-2 h-2 rounded-full bg-orange-500"></span> HIGH
+                    </span>
+                </div>
+            </div>
+            
+            <div class="w-full h-[400px]">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Event Cards Grid -->
+        <h2 class="text-xl font-semibold text-white mb-6 flex items-center gap-2 px-2">
+            <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            Dettaglio Eventi Storici
+        </h2>
+        
+        <div id="events-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <!-- Cards will be injected by JS -->
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Backtest Data Dataset
+        const backtestData = [
+            {
+                name: "Sarno (SA)",
+                year: "1998",
+                type: "Colamento Rapido",
+                iffi: 100,
+                soil: 95,
+                api: 100,
+                rain: 83,
+                precipMmh: 25.0,
+                satIdx: 95.2,
+                score: 100,
+                level: "CRITICAL",
+                override: "Nessuno (Base Estrema)",
+                description: "Evento catastrofico classico. L'elevata suscettibilità di base e le piogge prolungate hanno portato l'indice di saturazione al 95%. Lo score base raggiunge naturalmente il livello critico senza attivare override secondari."
+            },
+            {
+                name: "Giampilieri (ME)",
+                year: "2009",
+                type: "Colamento Rapido",
+                iffi: 100,
+                soil: 55,
+                api: 40,
+                rain: 100,
+                precipMmh: 120.0,
+                satIdx: 55.8,
+                score: 85.8,
+                level: "CRITICAL",
+                override: "Flash Event",
+                description: "Fenomeno temporalesco V-Shaped violentissimo (120 mm/h). Nonostante il suolo non fosse pienamente saturo (55.8%), l'algoritmo identifica l'intensità della pioggia come trigger critico."
+            },
+            {
+                name: "Ischia / Casamicciola",
+                year: "2022",
+                type: "Colamento Rapido",
+                iffi: 100,
+                soil: 75,
+                api: 65,
+                rain: 100,
+                precipMmh: 52.0,
+                satIdx: 74.8,
+                score: 100,
+                level: "CRITICAL",
+                override: "Flash Event",
+                description: "Combinazione fatale di precipitazioni molto intense (>50 mm/h) su un territorio altamente vulnerabile, con saturazione medio-alta. Condizioni letali catturate dal sistema."
+            },
+            {
+                name: "Cantiano (PU)",
+                year: "2022",
+                type: "Colamento Rapido",
+                iffi: 100,
+                soil: 30,
+                api: 15,
+                rain: 100,
+                precipMmh: 95.0,
+                satIdx: 56.3,
+                score: 86.3,
+                level: "CRITICAL",
+                override: "Flash Event (Estivo)",
+                description: "Evento estivo improvviso (settembre). Il modello applica pesi stagionali (bilanciando l'aridità del suolo) e il Flash Override entra in gioco per le piogge estreme (95 mm/h)."
+            },
+            {
+                name: "Emilia-Romagna",
+                year: "2023",
+                type: "Scivolamento Rotazionale",
+                iffi: 60,
+                soil: 98,
+                api: 100,
+                rain: 50,
+                precipMmh: 15.0,
+                satIdx: 91.6,
+                score: 75.8,
+                level: "CRITICAL",
+                override: "Saturation Floor",
+                description: "Piogge moderate ma suoli totalmente intrisi (API 100, Soil 98). Nonostante un IFFI medio (60), il Saturation Floor scatta, elevando la pericolosità al livello critico."
+            },
+            {
+                name: "Acquasanta Terme (AP)",
+                year: "2013",
+                type: "Complesso",
+                iffi: 40,
+                soil: 95,
+                api: 100,
+                rain: 60,
+                precipMmh: 18.0,
+                satIdx: 88.0,
+                score: 74.0,
+                level: "HIGH",
+                override: "Saturation Floor",
+                description: "Frana in zona con IFFI non elevato (40), ma in condizioni meteo estreme. L'altissima saturazione spinge il calcolo di sicurezza 'Floor' garantendo l'Allerta Arancione (HIGH)."
+            },
+            {
+                name: "Valtellina / Val Pola",
+                year: "1987",
+                type: "Scivolamento Traslativo",
+                iffi: 60,
+                soil: 90,
+                api: 95,
+                rain: 100,
+                precipMmh: 45.0,
+                satIdx: 96.3,
+                score: 78.1,
+                level: "CRITICAL",
+                override: "Saturation Floor",
+                description: "Scivolamento disastroso in alta montagna. Indice di saturazione altissimo dovuto a piogge persistenti e scioglimento nivale, combinato con elevata pioggia corrente."
+            },
+            {
+                name: "Controllo Negativo",
+                year: "2025",
+                type: "Scivolamento Rotazionale",
+                iffi: 60,
+                soil: 15,
+                api: 5,
+                rain: 0,
+                precipMmh: 0.0,
+                satIdx: 4.8,
+                score: 20.9,
+                level: "LOW",
+                override: "Nessuno",
+                description: "Giornata serena d'estate. Verifica fondamentale per prevenire l'alert fatigue: l'algoritmo mantiene uno score basso (~20) nonostante l'IFFI sia 60."
+            }
+        ];
+
+        // Level Colors Helper
+        const getLevelColor = (level) => {
+            switch(level) {
+                case 'CRITICAL': return '#ef4444'; // red-500
+                case 'HIGH': return '#f97316';     // orange-500
+                case 'MEDIUM': return '#eab308';   // yellow-500
+                default: return '#22c55e';         // green-500
+            }
+        };
+        
+        const getLevelBgColor = (level) => {
+            switch(level) {
+                case 'CRITICAL': return 'bg-red-500/10 border-red-500/30 text-red-400';
+                case 'HIGH': return 'bg-orange-500/10 border-orange-500/30 text-orange-400';
+                case 'MEDIUM': return 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400';
+                default: return 'bg-green-500/10 border-green-500/30 text-green-400';
+            }
+        };
+
+        // Initialize Chart
+        const initChart = () => {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: backtestData.map(d => `${d.name}`),
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Hazard Score Finale',
+                            data: backtestData.map(d => d.score),
+                            borderColor: '#818cf8',
+                            backgroundColor: '#818cf8',
+                            borderWidth: 3,
+                            pointBackgroundColor: backtestData.map(d => getLevelColor(d.level)),
+                            pointBorderColor: '#1e293b',
+                            pointBorderWidth: 2,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Indice di Saturazione (%)',
+                            data: backtestData.map(d => d.satIdx),
+                            backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                            borderColor: 'rgba(56, 189, 248, 0.5)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Suscettibilità Base (IFFI)',
+                            data: backtestData.map(d => d.iffi),
+                            backgroundColor: 'rgba(244, 114, 182, 0.1)',
+                            borderColor: 'rgba(244, 114, 182, 0.3)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: '#f8fafc',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            boxPadding: 6,
+                            usePointStyle: true,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.dataset.label}: ${context.parsed.y.toFixed(1)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                drawBorder: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 110,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    if (value === 30) return '30 (Med)';
+                                    if (value === 50) return '50 (High)';
+                                    if (value === 75) return '75 (Crit)';
+                                    if (value === 100) return '100';
+                                    return value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+        // Render Event Cards
+        const renderCards = () => {
+            const grid = document.getElementById('events-grid');
+            
+            backtestData.forEach(event => {
+                const isFlash = event.override.includes('Flash');
+                const isSat = event.override.includes('Saturation');
+                
+                const html = `
+                    <div class="glass-panel rounded-2xl overflow-hidden card-hover flex flex-col h-full border border-slate-700/50">
+                        <div class="p-5 border-b border-slate-700/50 flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold text-lg text-white leading-tight">${event.name}</h3>
+                                <p class="text-slate-400 text-sm mt-1">${event.year} • ${event.type}</p>
+                            </div>
+                            <div class="px-2.5 py-1 rounded-md text-xs font-bold border ${getLevelBgColor(event.level)}">
+                                ${event.level}
+                            </div>
+                        </div>
+                        
+                        <div class="p-5 flex-grow">
+                            <p class="text-slate-300 text-sm mb-5 leading-relaxed line-clamp-3">${event.description}</p>
+                            
+                            <div class="space-y-3 mt-auto">
+                                <div class="flex justify-between items-center text-sm">
+                                    <span class="text-slate-400">Score Finale</span>
+                                    <span class="font-bold text-white text-base">${event.score.toFixed(1)}</span>
+                                </div>
+                                
+                                <!-- Progress Bars -->
+                                <div>
+                                    <div class="flex justify-between text-xs mb-1">
+                                        <span class="text-slate-400">Indice Saturazione</span>
+                                        <span class="text-slate-200">${event.satIdx.toFixed(1)}%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-800 rounded-full h-1.5">
+                                        <div class="bg-sky-400 h-1.5 rounded-full" style="width: ${event.satIdx}%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <div class="flex justify-between text-xs mb-1">
+                                        <span class="text-slate-400">Rain Intensity</span>
+                                        <span class="text-slate-200">${event.precipMmh} mm/h</span>
+                                    </div>
+                                    <div class="w-full bg-slate-800 rounded-full h-1.5">
+                                        <div class="bg-blue-500 h-1.5 rounded-full" style="width: ${Math.min(100, (event.precipMmh/50)*100)}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="px-5 py-3 bg-slate-800/40 border-t border-slate-700/50 flex items-center justify-between">
+                            <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Override Logico</span>
+                            <span class="text-xs font-medium px-2 py-0.5 rounded-full 
+                                ${isFlash ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 
+                                  isSat ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 
+                                  'bg-slate-700/50 text-slate-400 border border-slate-600'}">
+                                ${event.override}
+                            </span>
+                        </div>
+                    </div>
+                `;
+                
+                grid.insertAdjacentHTML('beforeend', html);
+            });
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            renderCards();
+        });
+    </script>
+</body>
+</html>
