@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using it.gis_landslide_detection.web.Data;
 using it.gis_landslide_detection.web.Services;
+using it.gis_landslide_detection.web.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 using NetTopologySuite;
@@ -36,6 +37,12 @@ builder.Services.AddScoped<IIffiService, IffiService>();
 builder.Services.AddScoped<ITrailHazardCalculator, TrailHazardCalculator>();
 builder.Services.AddScoped<IWeatherService, WeatherService>();
 builder.Services.AddScoped<IHazardScoreEngine, HazardScoreEngine>();
+builder.Services.AddScoped<ITrailsRepository, TrailsRepository>();
+builder.Services.AddScoped<ITrailsService, TrailsService>();
+builder.Services.AddScoped<IHikingPointsRepository, HikingPointsRepository>();
+builder.Services.AddScoped<IHikingPointsService, HikingPointsService>();
+builder.Services.AddScoped<IIffiZonesRepository, IffiZonesRepository>();
+builder.Services.AddScoped<IIffiZonesService, IffiZonesService>();
 
 
 builder.Services.AddCors(options =>

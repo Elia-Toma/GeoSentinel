@@ -8,6 +8,8 @@ using NetTopologySuite.IO;
 using System;
 using System.Linq;
 using System.Threading;
+using it.gis_landslide_detection.web.Models;
+using it.gis_landslide_detection.web.DTOs;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace it.gis_landslide_detection.web.Controllers
@@ -16,7 +18,7 @@ namespace it.gis_landslide_detection.web.Controllers
     [Route("api/[controller]")]
     public class TrailsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ITrailsService _trailsService;
         private readonly IIffiService _iffi;
         private readonly ISentinelService _sentinel;
         private readonly IWeatherService _weather;
@@ -25,9 +27,16 @@ namespace it.gis_landslide_detection.web.Controllers
         private readonly IMemoryCache _cache;
         private static readonly SemaphoreSlim[] _shardedLocks = Enumerable.Range(0, 256).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
 
-        public TrailsController(ApplicationDbContext context, IIffiService iffiService, ISentinelService sentinelService, IWeatherService weatherService, IHazardScoreEngine hazardEngine, ILogger<TrailsController> logger, IMemoryCache cache)
+        public TrailsController(
+            ITrailsService trailsService, 
+            IIffiService iffiService, 
+            ISentinelService sentinelService, 
+            IWeatherService weatherService, 
+            IHazardScoreEngine hazardEngine, 
+            ILogger<TrailsController> logger, 
+            IMemoryCache cache)
         {
-            _context = context;
+            _trailsService = trailsService;
             _iffi = iffiService;
             _sentinel = sentinelService;
             _weather = weatherService;
@@ -44,23 +53,52 @@ namespace it.gis_landslide_detection.web.Controllers
             => double.IsFinite(value) ? value : fallback;
 
         // GET /api/trails
-        // Restituisce tutti i trail come array JSON con id, name e geom (GeoJSON)
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<ActionResult<IEnumerable<TrailDto>>> GetAll()
         {
-            var trails = await _context.HikingTrails
-                .Select(t => new {
-                    t.Id,
-                    t.Name,
-                    t.SacScale,
-                    // Serializza la geometria come stringa GeoJSON
-                    Geom = t.Geom != null
-                        ? new GeoJsonWriter().Write(t.Geom)
-                        : null
-                })
-                .ToListAsync();
-
+            var trails = await _trailsService.GetAllTrailsAsync();
             return Ok(trails);
+        }
+        
+        // GET /api/trails/{id}
+        [HttpGet("{id}")]
+        public async Task<ActionResult<TrailDto>> GetById(long id)
+        {
+            var trail = await _trailsService.GetTrailByIdAsync(id);
+            if (trail == null) return NotFound();
+            return Ok(trail);
+        }
+
+        // POST /api/trails
+        [HttpPost]
+        public async Task<ActionResult<TrailDto>> Create([FromBody] TrailUpsertDto trailDto)
+        {
+            if (trailDto == null) return BadRequest();
+            
+            var createdTrail = await _trailsService.CreateTrailAsync(trailDto);
+            return CreatedAtAction(nameof(GetById), new { id = createdTrail.Id }, createdTrail);
+        }
+        
+        // PUT /api/trails/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(long id, [FromBody] TrailUpsertDto trailDto)
+        {
+            if (trailDto == null) return BadRequest();
+
+            var success = await _trailsService.UpdateTrailAsync(id, trailDto);
+            if (!success) return NotFound();
+
+            return NoContent();
+        }
+
+        // DELETE /api/trails/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(long id)
+        {
+            var success = await _trailsService.DeleteTrailAsync(id);
+            if (!success) return NotFound();
+
+            return NoContent();
         }
 
         // GET /api/trails/{id}/hazard
