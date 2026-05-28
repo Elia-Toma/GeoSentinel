@@ -1,4 +1,4 @@
-﻿using it.gis_landslide_detection.web.Models;
+using it.gis_landslide_detection.web.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace it.gis_landslide_detection.web.Data
@@ -29,6 +29,20 @@ namespace it.gis_landslide_detection.web.Data
             modelBuilder.Entity<HikingTrail>()
                 .Property(t => t.Geom)
                 .HasColumnType("geometry");
+
+            modelBuilder.HasPostgresExtension("postgis");
+
+            modelBuilder.Entity<GisPoint>()
+                .Property(p => p.Geom)
+                .HasColumnType("geometry");
+
+            modelBuilder.Entity<GisLine>()
+                .Property(l => l.Geom)
+                .HasColumnType("geometry");
+
+            modelBuilder.Entity<GisPolygon>()
+                .Property(p => p.Geom)
+                .HasColumnType("geometry");
         }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -40,5 +54,9 @@ namespace it.gis_landslide_detection.web.Data
         public DbSet<IffiZone> IffiZones { get; set; }
 
         public DbSet<HikingTrail> HikingTrails { get; set; }
+
+        public DbSet<GisPoint> GisPoints { get; set; }
+        public DbSet<GisLine> GisLines { get; set; }
+        public DbSet<GisPolygon> GisPolygons { get; set; }
     }
 }

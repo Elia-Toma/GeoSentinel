@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  gis_db:
+    image: pgrouting/pgrouting:15-3.5-3.8
+    container_name: gis_local_db
+    environment:
+      - POSTGRES_DB=gis_local_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=your_secret_password
+    ports:
+      - "5433:5432" # Mappatura sulla 5433 per evitare conflitti
+    volumes:
+      - gis_local_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  gis_local_data:

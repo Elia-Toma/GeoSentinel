@@ -1,0 +1,481 @@
+/* ═══════════════════════════════════════════════════════════
+   GIS DATA EXPLORER — Stile derivato dal frontend GeoSentinel
+   Dark Mode • Glassmorphism • DM Mono / Syne
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── DESIGN TOKENS ─── */
+:root {
+    --bg-void: #060d1a;
+    --bg-deep: #0f172a;
+    --bg-panel: rgba(10, 20, 40, 0.72);
+    --border-ice: rgba(148, 163, 184, 0.12);
+    --text-dim: #64748b;
+    --text-soft: #94a3b8;
+    --text-base: #cbd5e1;
+    --text-hi: #f1f5f9;
+    --neon-safe: #10ffb0;
+    --neon-warn: #ffea00;
+    --neon-high: #ff8c00;
+    --neon-crit: #ff4060;
+    --accent: #38bdf8;
+    --accent-dim: rgba(56, 189, 248, 0.15);
+    --panel-width: 360px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg-void);
+    color: var(--text-base);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+/* ─── MAP ─── */
+#map {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+}
+
+/* ─── TOP BAR ─── */
+#topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 20;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: linear-gradient(180deg, rgba(6,13,26,0.9) 0%, transparent 100%);
+    backdrop-filter: blur(8px);
+}
+
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+.topbar-divider {
+    width: 1px; height: 20px;
+    background: var(--border-ice);
+}
+
+.topbar-tagline {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.25rem;
+    color: var(--text-hi);
+}
+.logo-text span { color: var(--neon-safe); }
+
+.clock-pill {
+    display: flex; align-items: center;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-ice);
+    border-radius: 99px;
+    padding: 4px 12px;
+    font-size: 0.68rem;
+    color: var(--text-base);
+    font-variant-numeric: tabular-nums;
+}
+
+.status-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(16,255,176,0.08);
+    border: 1px solid rgba(16,255,176,0.25);
+    border-radius: 99px;
+    padding: 4px 12px;
+    font-size: 0.68rem;
+    color: var(--neon-safe);
+}
+
+.pulse-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--neon-safe);
+    animation: pulse-glow 1.6s ease-in-out infinite;
+}
+
+/* ─── COORDINATE BAR ─── */
+.coord-bar {
+    position: fixed;
+    bottom: 12px; left: 12px;
+    z-index: 10;
+    background: rgba(6,13,26,0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-ice);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.55rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+/* ─── SIDE PANEL ─── */
+#gis-panel {
+    position: fixed;
+    top: 72px; right: 16px; bottom: 16px;
+    z-index: 20;
+    width: var(--panel-width);
+    background: var(--bg-panel);
+    border: 1px solid var(--border-ice);
+    border-radius: 18px;
+    backdrop-filter: blur(24px) saturate(1.4);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), opacity 0.3s ease-out;
+}
+
+/* ─── PANEL HEADER ─── */
+.panel-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--border-ice);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+.panel-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+.panel-subtitle {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text-hi);
+}
+
+/* ─── PANEL CONTROLS ─── */
+.panel-controls {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border-ice);
+    flex: 0 0 auto;
+}
+
+.control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    min-width: 50px;
+}
+
+.gis-select, .gis-input {
+    flex: 1;
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-ice);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-hi);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.gis-select:focus, .gis-input:focus {
+    border-color: var(--accent);
+}
+.gis-select option {
+    background-color: var(--bg-deep);
+    color: var(--text-hi);
+}
+
+.gis-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-ice);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-hi);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.gis-btn:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.gis-btn.active {
+    background: rgba(16,255,176,0.12);
+    border-color: var(--neon-safe);
+    color: var(--neon-safe);
+}
+.gis-btn.btn-danger {
+    border-color: rgba(255,64,96,0.4);
+    color: var(--neon-crit);
+}
+.gis-btn.btn-danger:hover {
+    background: rgba(255,64,96,0.15);
+}
+
+/* ─── LAYER TOGGLES ─── */
+.layer-toggles {
+    display: flex; gap: 6px; flex-wrap: wrap;
+}
+.layer-toggle {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 1px solid var(--border-ice);
+    background: rgba(255,255,255,0.03);
+    font-size: 0.62rem;
+    color: var(--text-soft);
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+.layer-toggle.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.layer-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+}
+
+/* ─── SCROLLABLE CONTENT ─── */
+.panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 18px 16px;
+    scrollbar-width: none;
+}
+.panel-content::-webkit-scrollbar { display: none; }
+
+.section-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    margin-top: 12px;
+}
+.section-label:first-child { margin-top: 0; }
+
+/* ─── DATA CARDS ─── */
+.data-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-ice);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+}
+.data-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+}
+.card-accent-blue::before { background: var(--accent); }
+.card-accent-green::before { background: var(--neon-safe); }
+.card-accent-orange::before { background: var(--neon-high); }
+.card-accent-red::before { background: var(--neon-crit); }
+
+.card-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; }
+.card-value { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1rem; color: var(--text-hi); margin-top: 2px; }
+.card-sub { font-size: 0.65rem; color: var(--text-soft); margin-top: 3px; }
+
+/* ─── FEATURE LIST ─── */
+.feature-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.7rem;
+}
+.feature-item:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: var(--border-ice);
+}
+.feature-item.selected {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+}
+.feature-item .feature-name {
+    color: var(--text-hi);
+    font-weight: 500;
+}
+.feature-item .feature-type {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+.feature-actions {
+    display: flex; gap: 4px;
+}
+.feature-actions button {
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-ice);
+    background: transparent;
+    color: var(--text-soft);
+    font-size: 0.6rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.feature-actions button:hover {
+    background: rgba(255,64,96,0.15);
+    border-color: rgba(255,64,96,0.4);
+    color: var(--neon-crit);
+}
+
+/* ─── LEGEND ─── */
+.legend-box {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    z-index: 15;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-ice);
+    border-radius: 12px;
+    backdrop-filter: blur(24px) saturate(1.4);
+    padding: 12px 16px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+    min-width: 160px;
+    transition: right 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+.legend-box.shifted {
+    right: calc(var(--panel-width) + 32px);
+}
+.legend-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.65rem;
+    color: var(--text-soft);
+    margin-bottom: 4px;
+}
+.legend-swatch {
+    width: 20px; height: 12px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ─── ROUTING PANEL ─── */
+.routing-status {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(56,189,248,0.06);
+    border: 1px solid rgba(56,189,248,0.2);
+    font-size: 0.68rem;
+    color: var(--accent);
+    display: none;
+}
+.routing-status.active { display: block; }
+
+/* ─── TOAST NOTIFICATIONS ─── */
+.toast {
+    position: fixed;
+    top: 70px;
+    left: 50%; transform: translateX(-50%);
+    z-index: 100;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-ice);
+    border-radius: 12px;
+    backdrop-filter: blur(24px);
+    padding: 12px 24px;
+    font-size: 0.72rem;
+    color: var(--text-hi);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+}
+.toast.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+.toast.success { border-color: rgba(16,255,176,0.4); color: var(--neon-safe); }
+.toast.error { border-color: rgba(255,64,96,0.4); color: var(--neon-crit); }
+
+/* ─── LEAFLET OVERRIDES ─── */
+.leaflet-control-zoom { transform: scale(1.15); transform-origin: top left; margin-top: 10px !important; }
+.leaflet-top.leaflet-left { top: 60px; }
+.leaflet-control-attribution { display: none; }
+
+/* geoman toolbar - theme match */
+.leaflet-pm-toolbar .leaflet-pm-icon-delete,
+.leaflet-pm-toolbar .leaflet-pm-icon-edit {
+    filter: invert(1) brightness(1.4);
+}
+
+/* ─── ANIMATIONS ─── */
+@keyframes pulse-glow {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,255,176,0.5); }
+    50% { opacity: 0.6; box-shadow: 0 0 0 5px rgba(16,255,176,0); }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+    #gis-panel {
+        top: auto; bottom: 0;
+        left: 0; right: 0;
+        width: 100%;
+        height: 50vh;
+        border-radius: 18px 18px 0 0;
+    }
+    .legend-box { bottom: 52vh; right: 12px; }
+    .legend-box.shifted { right: 12px; }
+    .topbar-divider, .topbar-tagline, .clock-pill { display: none; }
+}

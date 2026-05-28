@@ -1,8 +1,179 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@{
+    ViewData["Title"] = "GIS Data Explorer";
+    Layout = "~/Views/Shared/_GisLayout.cshtml";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<!-- ═══ MAP ═══ -->
+<main id="map" role="application" aria-label="Mappa GIS"></main>
+
+<!-- ═══ TOP BAR ═══ -->
+<header id="topbar" role="banner">
+    <div class="topbar-left">
+        <div class="logo-text">Geo<span>Data</span></div>
+        <div class="topbar-divider"></div>
+        <div class="topbar-tagline">GIS DATA EXPLORER</div>
+    </div>
+    <div class="topbar-right">
+        <div class="clock-pill" id="global-clock">00:00:00 UTC</div>
+        <div class="status-pill">
+            <div class="pulse-dot"></div>
+            <span>PostGIS Attivo</span>
+        </div>
+    </div>
+</header>
+
+<!-- ═══ COORD BAR ═══ -->
+<div id="coord-bar" class="coord-bar">LAT: --.---- | LNG: --.----</div>
+
+<!-- ═══ TOAST ═══ -->
+<div id="toast" class="toast"></div>
+
+<!-- ═══ SIDE PANEL ═══ -->
+<aside id="gis-panel">
+    <div class="panel-header">
+        <div class="panel-title">Pannello Dati GIS</div>
+        <div class="panel-subtitle" id="panel-subtitle">Layer, Filtri e CRUD</div>
+    </div>
+
+    <!-- Layer Toggles -->
+    <div class="panel-controls">
+        <div class="section-label">Layer Visibili</div>
+        <div class="layer-toggles">
+            <div class="layer-toggle active" data-layer="points" onclick="GIS.toggleLayer('points', this)">
+                <div class="layer-dot" style="background: var(--accent);"></div>
+                Punti
+            </div>
+            <div class="layer-toggle active" data-layer="lines" onclick="GIS.toggleLayer('lines', this)">
+                <div class="layer-dot" style="background: linear-gradient(135deg, #0284c7 50%, #f59e0b 50%);"></div>
+                Linee
+            </div>
+            <div class="layer-toggle active" data-layer="polygons" onclick="GIS.toggleLayer('polygons', this)">
+                <div class="layer-dot" style="background: var(--neon-high);"></div>
+                Poligoni
+            </div>
+        </div>
+
+        <div class="section-label" style="margin-top: 8px;">Filtra per Tipo</div>
+        <div class="control-row">
+            <select id="filter-type" class="gis-select" onchange="GIS.applyFilter()">
+                <option value="">Mostra tutto</option>
+                <option value="Restaurant">🍕 Ristoranti</option>
+                <option value="School">🏫 Scuole</option>
+                <option value="Road">🛤️ Strade</option>
+                <option value="River">🌊 Fiumi</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Tools -->
+    <div class="panel-controls">
+        <div class="section-label">Strumenti</div>
+        <div class="control-row">
+            <button class="gis-btn" onclick="GIS.startDrawPoint()" title="Disegna un nuovo punto">📍 Punto</button>
+            <button class="gis-btn" onclick="GIS.startDrawLine()" title="Disegna una nuova linea">📏 Linea</button>
+            <button class="gis-btn" onclick="GIS.startDrawPolygon()" title="Disegna un nuovo poligono">⬡ Poligono</button>
+        </div>
+        <div class="control-row">
+            <button class="gis-btn" id="btn-nearest" onclick="GIS.toggleNearest()" title="Clicca sulla mappa per trovare i punti più vicini">🎯 Nearest</button>
+            <button class="gis-btn" id="btn-within" onclick="GIS.toggleWithin()" title="Disegna un'area per cercare i punti al suo interno">🔲 Within</button>
+            <button class="gis-btn" id="btn-route" onclick="GIS.toggleRoute()" title="Clicca due punti per calcolare il percorso">🧭 Route</button>
+        </div>
+    </div>
+
+    <!-- Routing Status -->
+    <div class="panel-controls" style="padding-top: 0; border-bottom: none;">
+        <div class="routing-status" id="routing-status">
+            Clicca sulla mappa per impostare partenza e arrivo...
+        </div>
+    </div>
+
+    <!-- Feature List -->
+    <div class="panel-content">
+        <div class="section-label">Statistiche</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <div class="data-card card-accent-blue" style="flex:1;">
+                <div class="card-label">Punti</div>
+                <div class="card-value" id="stat-points">0</div>
+            </div>
+            <div class="data-card card-accent-green" style="flex:1;">
+                <div class="card-label">Linee</div>
+                <div class="card-value" id="stat-lines">0</div>
+            </div>
+            <div class="data-card card-accent-orange" style="flex:1;">
+                <div class="card-label">Poligoni</div>
+                <div class="card-value" id="stat-polygons">0</div>
+            </div>
+        </div>
+
+        <div class="section-label">Elementi sulla Mappa</div>
+        <div class="feature-list" id="feature-list">
+            <!-- Popolato dinamicamente -->
+        </div>
+    </div>
+</aside>
+
+<!-- ═══ LEGEND (per la coropletica) ═══ -->
+<div class="legend-box shifted" id="legend-box">
+    <div class="legend-title">Popolazione Comuni</div>
+    <div id="legend-items">
+        <!-- Popolato dinamicamente -->
+    </div>
 </div>
+
+<!-- ═══ CUSTOM MODAL FOR PROMPTS ═══ -->
+<style>
+/* Custom Drawing Prompt Modal styling */
+.custom-modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+}
+.custom-modal-overlay.active { opacity: 1; pointer-events: auto; }
+.custom-modal {
+  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+  padding: 24px; width: 380px; max-width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+  color: #cbd5e1; font-family: 'Syne', sans-serif;
+}
+.custom-modal-title {
+  font-size: 1.2rem; font-weight: 700; color: #f8fafc;
+  margin-bottom: 16px; border-bottom: 1px solid #334155; padding-bottom: 8px;
+}
+.custom-modal-field { margin-bottom: 14px; }
+.custom-modal-label {
+  display: block; font-size: 0.8rem; text-transform: uppercase;
+  letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 6px;
+}
+.custom-modal-input {
+  width: 100%; background: #0f172a; border: 1px solid #475569;
+  color: #f1f5f9; padding: 8px 12px; border-radius: 6px;
+  font-size: 0.9rem; font-family: 'DM Mono', monospace; outline: none;
+  transition: border-color 0.2s; box-sizing: border-box;
+}
+.custom-modal-input:focus { border-color: #38bdf8; }
+.custom-modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+.custom-modal-btn {
+  padding: 8px 16px; border-radius: 6px; font-size: 0.85rem;
+  font-weight: 600; cursor: pointer; border: none; transition: background 0.2s;
+}
+.custom-modal-btn-cancel { background: #334155; color: #94a3b8; }
+.custom-modal-btn-cancel:hover { background: #475569; color: #cbd5e1; }
+.custom-modal-btn-confirm { background: #38bdf8; color: #0f172a; }
+.custom-modal-btn-confirm:hover { background: #7dd3fc; }
+</style>
+
+<div class="custom-modal-overlay" id="custom-modal-overlay">
+    <div class="custom-modal">
+        <div class="custom-modal-title" id="custom-modal-title">Nuovo Elemento</div>
+        <div id="custom-modal-fields-container"></div>
+        <div class="custom-modal-actions">
+            <button class="custom-modal-btn custom-modal-btn-cancel" id="custom-modal-btn-cancel">Annulla</button>
+            <button class="custom-modal-btn custom-modal-btn-confirm" id="custom-modal-btn-confirm">Conferma</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module" src="~/js/gis/main.js" asp-append-version="true"></script>
+}

@@ -43,6 +43,7 @@ builder.Services.AddScoped<IHikingPointsRepository, HikingPointsRepository>();
 builder.Services.AddScoped<IHikingPointsService, HikingPointsService>();
 builder.Services.AddScoped<IIffiZonesRepository, IffiZonesRepository>();
 builder.Services.AddScoped<IIffiZonesService, IffiZonesService>();
+builder.Services.AddScoped<IRoutingService, RoutingService>();
 
 
 builder.Services.AddCors(options =>
@@ -105,18 +106,24 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
+        
+        // Assicura che il database e la struttura PostGIS vengano creati
+        db.Database.EnsureCreated();
+
         if (db.Database.CanConnect())
         {
-            Console.WriteLine("Supabase: connessione OK");
+            Console.WriteLine("Database: connessione OK");
+            // Popola con i dati di mock GIS
+            await it.gis_landslide_detection.web.Data.GisDataSeeder.SeedAsync(db);
         }
         else
         {
-            Console.WriteLine("Supabase: impossibile connettersi al database.");
+            Console.WriteLine("Database: impossibile connettersi al database.");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Supabase: errore durante il test di connessione - {ex.Message}");
+        Console.WriteLine($"Database: errore durante il test di connessione - {ex.Message}");
     }
 }
 

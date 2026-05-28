@@ -12,3 +12,58 @@ Accept: application/json
 ### 3. Test Coordinate diverse (Gran Sasso)
 GET {{base_url_azure}}/api/Landslide?lat=42.4430&lng=13.5670
 Accept: application/json
+
+### ==========================================
+### TEST ENDPOINT GIS (LOCAL DOCKER POSTGIS)
+### ==========================================
+
+### 4. Recupera tutti i Punti (GeoJSON)
+GET {{base_url_local}}/api/GisData/points
+Accept: application/json
+
+### 5. Filtra i Punti per Tipo (Ristoranti)
+GET {{base_url_local}}/api/GisData/points?type=Restaurant
+Accept: application/json
+
+### 6. Recupera tutte le Linee (Fiumi/Strade in GeoJSON)
+GET {{base_url_local}}/api/GisData/lines
+Accept: application/json
+
+### 7. Recupera i Poligoni dei Comuni (GeoJSON)
+GET {{base_url_local}}/api/GisData/polygons
+Accept: application/json
+
+### 8. Ricerca Spaziale: Trova i 2 punti più vicini a lat/lng
+GET {{base_url_local}}/api/GisData/nearest?lat=43.1&lng=13.4&limit=2
+Accept: application/json
+
+### 9. Routing Dijkstra: Calcola il tragitto stradale più breve
+GET {{base_url_local}}/api/GisData/route?startLat=43.1&startLng=13.4&endLat=43.2&endLng=13.5
+Accept: application/json
+
+### 10. CRUD: Aggiungi un nuovo Punto Ristorante
+POST {{base_url_local}}/api/GisData/points
+Content-Type: application/json
+
+{
+  "name": "Trattoria da Paolo",
+  "type": "Restaurant",
+  "lat": 43.115,
+  "lng": 13.405
+}
+
+### 11. Spatial Query: Trova i punti dentro un'area poligonale
+POST {{base_url_local}}/api/GisData/points/within
+Content-Type: application/json
+
+{
+  "name": "SearchArea",
+  "coordinates": [
+    [13.38, 43.07],
+    [13.46, 43.07],
+    [13.46, 43.16],
+    [13.38, 43.16],
+    [13.38, 43.07]
+  ]
+}
+
