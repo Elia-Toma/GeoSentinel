@@ -19,10 +19,10 @@ BEGIN
     WHERE type = 'Sentiero' AND geom IS NOT NULL;
 
     -- Crea la topologia (crea la tabella gis_lines_vertices_pgr con i nodi/incroci)
-    -- Tolleranza: 0.00001 gradi (circa 1 metro)
+    -- Tolleranza: 0.0001 gradi (circa 11 metri)
     PERFORM pgr_createTopology(
         'gis_lines', 
-        0.00001, 
+        0.0001, 
         'geom', 
         'id', 
         'source', 

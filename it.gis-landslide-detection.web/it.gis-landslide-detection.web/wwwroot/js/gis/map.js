@@ -19,6 +19,12 @@ export function initMap(onMapClick, onDrawCreated) {
         drawPolygon: false, drawCircle: false, drawCircleMarker: false, drawRectangle: false,
         drawText: false, editMode: false, dragMode: false, cutPolygon: false, removalMode: false,
         rotateMode: false });
+        
+    state.map.pm.setGlobalOptions({
+        snappable: true,
+        snapDistance: 20,
+        snapSegment: false
+    });
 }
 
 /**

@@ -19,7 +19,7 @@ async function loadAll() {
         renderLayers();
         updateStats(state);
         renderFeatureList(state);
-        setTimeout(enableEditing, 500);
+        if (state.isEditMode) setTimeout(enableEditing, 500);
     } catch (err) {
         console.error('Errore caricamento dati:', err);
         showToast('Errore di connessione alle API', 'error');
@@ -600,13 +600,27 @@ function enableEditing() {
 initMap(onMapClick, onDrawCreated);
 initClock();
 loadAll().then(() => {
-    setTimeout(enableEditing, 500);
+    if (state.isEditMode) setTimeout(enableEditing, 500);
 });
+
+function toggleEditMode() {
+    state.isEditMode = !state.isEditMode;
+    const btn = document.getElementById('btn-edit');
+    if (state.isEditMode) {
+        if (btn) { btn.textContent = '✏️ Modifica Dati: ON'; btn.classList.add('active'); }
+        enableEditing();
+        showToast('Modalità modifica attivata', 'success');
+    } else {
+        if (btn) { btn.textContent = '✏️ Modifica Dati: OFF'; btn.classList.remove('active'); }
+        disableEditing();
+        showToast('Modalità modifica disattivata', 'info');
+    }
+}
 
 // Expose GIS to global scope to keep inline HTML event handlers (onclick="GIS.x()") working seamlessly
 window.GIS = {
     toggleLayer, applyFilter, applyAreaFilter,
     startDrawPoint, startDrawLine, startDrawPolygon,
     toggleNearest, toggleWithin, toggleIntersection, toggleRoute,
-    deleteFeature, zoomTo: zoomToFeature
+    deleteFeature, zoomTo: zoomToFeature, toggleEditMode
 };

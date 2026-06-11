@@ -11,5 +11,6 @@ export const state = {
     withinLayer: null,
     intersectionLayer: null,
     searchAreaLayer: null,
-    drawMeta: null
+    drawMeta: null,
+    isEditMode: false
 };

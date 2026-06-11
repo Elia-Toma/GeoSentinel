@@ -150,14 +150,22 @@ namespace it.gis_landslide_detection.web.Services
                     SELECT geom FROM gis_lines WHERE id IN (@startEdge, @endEdge)
                 ),
                 path_query AS (
-                    SELECT ST_LineMerge(ST_Collect(geom)) AS path_geom
+                    SELECT ST_LineMerge(ST_Collect(geom)) AS merged_geom
                     FROM all_geoms
+                ),
+                force_linestring AS (
+                    SELECT 
+                        CASE 
+                            WHEN ST_GeometryType(merged_geom) = 'ST_LineString' THEN merged_geom
+                            ELSE ST_GeometryN(merged_geom, 1)
+                        END AS path_geom
+                    FROM path_query
                 ),
                 sliced_path AS (
                     SELECT path_geom,
                            ST_LineLocatePoint(path_geom, ST_SetSRID(ST_MakePoint(@startLng, @startLat), 4326)) AS f_start,
                            ST_LineLocatePoint(path_geom, ST_SetSRID(ST_MakePoint(@endLng, @endLat), 4326)) AS f_end
-                    FROM path_query
+                    FROM force_linestring
                 )
                 SELECT ST_AsText(
                     ST_LineSubstring(
