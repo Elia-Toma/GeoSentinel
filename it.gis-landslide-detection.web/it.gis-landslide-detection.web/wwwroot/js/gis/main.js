@@ -6,10 +6,12 @@ import { initMap, choroplethStyle, makePopup, clearMode, zoomToFeature } from '.
 /* ═══ LOAD DATA ═══ */
 async function loadAll() {
     try {
+        const minArea = getMinAreaFilter();
+        const areaParam = minArea > 0 ? `?minArea=${minArea}` : '';
         const [pts, lns, pgs] = await Promise.all([
             apiFetch('/api/GisData/points'),
             apiFetch('/api/GisData/lines'),
-            apiFetch('/api/GisData/polygons')
+            apiFetch(`/api/GisData/polygons${areaParam}`)
         ]);
         state.data.points = pts;
         state.data.lines = lns;
@@ -24,6 +26,11 @@ async function loadAll() {
     }
 }
 
+function getMinAreaFilter() {
+    const el = document.getElementById('filter-min-area');
+    return el ? parseFloat(el.value) || 0 : 0;
+}
+
 /* ═══ RENDER LAYERS ═══ */
 function renderLayers() {
     const m = state.map;
@@ -34,7 +41,7 @@ function renderLayers() {
     if (state.visible.points && state.data.points) {
         state.layers.points = L.geoJSON(state.data.points, {
             pointToLayer: (f, ll) => L.circleMarker(ll, {
-                radius: 7, fillColor: '#38bdf8', color: '#0f172a', weight: 2, fillOpacity: 0.9
+                radius: 8, fillColor: '#38bdf8', color: '#0f172a', weight: 2, fillOpacity: 0.9
             }),
             onEachFeature: (f, layer) => {
                 const p = f.properties;
@@ -51,10 +58,12 @@ function renderLayers() {
         state.layers.lines = L.geoJSON(state.data.lines, {
             style: (f) => {
                 const type = f.properties?.type || f.properties?.Type;
-                if (type === 'River') {
-                    return { color: '#0284c7', weight: 4, opacity: 0.85 };
-                } else if (type === 'Road') {
-                    return { color: '#f59e0b', weight: 3.5, opacity: 0.85 };
+                if (type === 'Torrente') {
+                    return { color: '#0284c7', weight: 3, opacity: 0.85 };
+                } else if (type === 'Fiume') {
+                    return { color: '#1e40af', weight: 4, opacity: 0.85 };
+                } else if (type === 'Sentiero') {
+                    return { color: '#a16207', weight: 2.5, opacity: 0.9, dashArray: '6,3' };
                 }
                 return { color: '#10ffb0', weight: 3, opacity: 0.8 };
             },
@@ -73,7 +82,7 @@ function renderLayers() {
 
     if (state.visible.polygons && state.data.polygons) {
         state.layers.polygons = L.geoJSON(state.data.polygons, {
-            style: f => choroplethStyle(f.properties.population),
+            style: f => choroplethStyle(f.properties.riskLevel ?? f.properties.population ?? 0),
             onEachFeature: (f, layer) => {
                 const p = f.properties;
                 const fid = f.id || p.id;
@@ -114,7 +123,7 @@ async function onLineEdited(layer, id) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: f.name, type: f.type, coordinates: coords })
         });
-        showToast('Linea aggiornata!', 'success');
+        showToast('Sentiero aggiornato!', 'success');
         await loadAll();
     } catch (err) { showToast('Errore: ' + err.message, 'error'); }
 }
@@ -129,9 +138,9 @@ async function onPolygonEdited(layer, id) {
         await apiFetch(`/api/GisData/polygons/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: f.name, population: f.population || 0, coordinates: coords })
+            body: JSON.stringify({ name: f.name, population: f.riskLevel ?? f.population ?? 0, coordinates: coords })
         });
-        showToast('Poligono aggiornato!', 'success');
+        showToast('Zona di rischio aggiornata!', 'success');
         await loadAll();
     } catch (err) { showToast('Errore: ' + err.message, 'error'); }
 }
@@ -153,21 +162,29 @@ function toggleLayer(name, btn) {
 function applyFilter() {
     const typeFilter = document.getElementById('filter-type').value;
     if (!typeFilter) { loadAll(); return; }
-    const isGeomFilter = ['Road', 'River'].includes(typeFilter);
 
-    if (isGeomFilter) {
+    // Linee: Sentiero, Torrente, Fiume
+    const isLineType = ['Sentiero', 'Torrente', 'Fiume'].includes(typeFilter);
+
+    if (isLineType) {
         apiFetch(`/api/GisData/lines?type=${typeFilter}`).then(d => {
             state.data.lines = d;
             state.data.points = { type: 'FeatureCollection', features: [] };
             renderLayers(); updateStats(state); renderFeatureList(state);
         });
     } else {
+        // Punti: Baita, PuntoRistoro
         apiFetch(`/api/GisData/points?type=${typeFilter}`).then(d => {
             state.data.points = d;
             state.data.lines = { type: 'FeatureCollection', features: [] };
             renderLayers(); updateStats(state); renderFeatureList(state);
         });
     }
+}
+
+/* ═══ FILTRO SUPERFICIE POLIGONI ═══ */
+function applyAreaFilter() {
+    loadAll(); // loadAll legge già il valore da #filter-min-area
 }
 
 /* ═══ DRAW TOOLS ═══ */
@@ -199,10 +216,23 @@ window.showCustomModal = (title, fields, onConfirm, onCancel) => {
     label.className = 'custom-modal-label';
     label.textContent = f.label;
     
-    const input = document.createElement('input');
-    input.className = 'custom-modal-input';
-    input.type = f.type || 'text';
-    input.value = f.default || '';
+    let input;
+    if (f.options) {
+        input = document.createElement('select');
+        input.className = 'custom-modal-input';
+        f.options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (opt.value === f.default) o.selected = true;
+            input.appendChild(o);
+        });
+    } else {
+        input = document.createElement('input');
+        input.className = 'custom-modal-input';
+        input.type = f.type || 'text';
+        input.value = f.default || '';
+    }
     input.id = 'modal-input-' + f.name;
     
     fieldDiv.appendChild(label);
@@ -266,8 +296,16 @@ window.showCustomConfirm = (message, onConfirm, onCancel) => {
 function startDrawPoint() {
     clearMode();
     window.showCustomModal('Nuovo Punto 📍', [
-        { name: 'name', label: 'Nome del punto', default: 'Nuovo Punto' },
-        { name: 'type', label: 'Tipo (es. Restaurant, School)', default: 'Restaurant' }
+        { name: 'name', label: 'Nome', default: 'Nuovo Punto' },
+        { 
+            name: 'type', 
+            label: 'Tipo', 
+            options: [
+                { value: 'Baita', label: '🏔️ Baita' },
+                { value: 'PuntoRistoro', label: '☕ Punto Ristoro' }
+            ],
+            default: 'Baita'
+        }
     ], (data) => {
         if (!data.name || !data.type) return;
         state.drawMeta = { name: data.name, type: data.type };
@@ -280,8 +318,17 @@ function startDrawPoint() {
 function startDrawLine() {
     clearMode();
     window.showCustomModal('Nuova Linea 📏', [
-        { name: 'name', label: 'Nome della linea', default: 'Nuova Linea' },
-        { name: 'type', label: 'Tipo (es. Road, River)', default: 'Road' }
+        { name: 'name', label: 'Nome', default: 'Nuovo Sentiero' },
+        {
+            name: 'type',
+            label: 'Tipo',
+            options: [
+                { value: 'Sentiero', label: '🥾 Sentiero' },
+                { value: 'Torrente', label: '🌊 Torrente' },
+                { value: 'Fiume', label: '🏞️ Fiume' }
+            ],
+            default: 'Sentiero'
+        }
     ], (data) => {
         if (!data.name || !data.type) return;
         state.drawMeta = { name: data.name, type: data.type };
@@ -293,12 +340,19 @@ function startDrawLine() {
 
 function startDrawPolygon() {
     clearMode();
-    window.showCustomModal('Nuovo Poligono ⬡', [
-        { name: 'name', label: 'Nome del comune', default: 'Nuovo Comune' },
-        { name: 'population', label: 'Popolazione', default: '1000', type: 'number' }
+    window.showCustomModal('Nuova Zona di Rischio ⬡', [
+        { name: 'name', label: 'Nome della zona', default: 'Nuova Zona Rischio' },
+        { 
+            name: 'population',
+            label: 'Livello di rischio (0-100)',
+            type: 'number',
+            default: '40',
+            // Suggerimento: 100=ColamentoRapido, 80=Crollo, 60=Scivolamento, 40=Complesso, 20=Basso
+        }
     ], (data) => {
         if (!data.name) return;
-        state.drawMeta = { name: data.name, population: parseInt(data.population || '0') };
+        const risk = Math.max(0, Math.min(100, parseInt(data.population || '40')));
+        state.drawMeta = { name: data.name, population: risk };
         disableEditing();
         state.map.pm.enableDraw('Polygon');
         showToast('Clicca per disegnare i vertici, clicca sul primo per chiudere', 'success');
@@ -315,6 +369,7 @@ async function onDrawCreated(e) {
         coords.push(coords[0]);
         state.searchAreaLayer = layer;
         layer.setStyle({ color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.1, dashArray: '6,4' });
+        layer.bringToBack();
 
         try {
             const filterType = document.getElementById('filter-type')?.value;
@@ -337,6 +392,33 @@ async function onDrawCreated(e) {
         } catch (err) { showToast('Errore: ' + err.message, 'error'); }
         state.mode = null;
         document.getElementById('btn-within').classList.remove('active');
+        return;
+    }
+
+    // ── Intersection mode: handle the search polygon ──
+    if (state.mode === 'intersection' && shape === 'Polygon') {
+        const coords = layer.getLatLngs()[0].map(ll => [ll.lng, ll.lat]);
+        coords.push(coords[0]);
+        state.searchAreaLayer = layer;
+        layer.setStyle({ color: '#a855f7', fillColor: '#a855f7', fillOpacity: 0.1, dashArray: '6,4' });
+        layer.bringToBack();
+
+        try {
+            const result = await apiFetch('/api/GisData/intersections', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: 'intersection-search', coordinates: coords })
+            });
+            if (state.intersectionLayer) state.map.removeLayer(state.intersectionLayer);
+            state.intersectionLayer = L.geoJSON(result, {
+                style: { color: '#a855f7', weight: 5, opacity: 1 },
+                onEachFeature: (f, layer) => layer.bindPopup(makePopup('line', f.properties))
+            }).addTo(state.map);
+            const count = result?.features?.length || 0;
+            showToast(`${count} sentieri intersecano l'area`, 'success');
+        } catch (err) { showToast('Errore: ' + err.message, 'error'); }
+        state.mode = null;
+        document.getElementById('btn-intersection').classList.remove('active');
         return;
     }
 
@@ -407,6 +489,15 @@ function toggleWithin() {
     showToast('Disegna un\'area per trovare i punti al suo interno', 'success');
 }
 
+function toggleIntersection() {
+    if (state.mode === 'intersection') { clearMode(); return; }
+    clearMode();
+    state.mode = 'intersection';
+    document.getElementById('btn-intersection').classList.add('active');
+    state.map.pm.enableDraw('Polygon');
+    showToast('Disegna un\'area per trovare i sentieri che la attraversano', 'success');
+}
+
 function toggleRoute() {
     if (state.mode === 'route') { clearMode(); return; }
     clearMode();
@@ -472,7 +563,6 @@ async function onMapClick(e) {
                     style: { color: '#38bdf8', weight: 5, opacity: 1, dashArray: '8,4' }
                 }).addTo(state.map);
                 
-                // Aggiorna la posizione dei marker sulla mappa per farli aderire perfettamente alle strade
                 const p = result.properties;
                 if (p && p.snappedStartLat && p.snappedStartLng && p.snappedEndLat && p.snappedEndLng) {
                     if (state.routeMarkers[0]) {
@@ -515,8 +605,8 @@ loadAll().then(() => {
 
 // Expose GIS to global scope to keep inline HTML event handlers (onclick="GIS.x()") working seamlessly
 window.GIS = {
-    toggleLayer, applyFilter,
+    toggleLayer, applyFilter, applyAreaFilter,
     startDrawPoint, startDrawLine, startDrawPolygon,
-    toggleNearest, toggleWithin, toggleRoute,
+    toggleNearest, toggleWithin, toggleIntersection, toggleRoute,
     deleteFeature, zoomTo: zoomToFeature
 };

@@ -69,8 +69,9 @@ namespace it.gis_landslide_detection.web.Controllers
         }
 
         // GET: api/GisData/polygons
+        // minArea: superficie minima in m² (filtro spaziale su ST_Area)
         [HttpGet("polygons")]
-        public async Task<IActionResult> GetPolygons([FromQuery] int? minPopulation)
+        public async Task<IActionResult> GetPolygons([FromQuery] int? minPopulation, [FromQuery] double? minArea)
         {
             var query = _context.GisPolygons.AsQueryable();
             if (minPopulation.HasValue)
@@ -79,9 +80,29 @@ namespace it.gis_landslide_detection.web.Controllers
             }
 
             var polygons = await query.ToListAsync();
+
+            // Filtro per superficie: ST_Area via NTS lato C# (già in RAM dopo la query)
+            if (minArea.HasValue && minArea.Value > 0)
+            {
+                // Convertiamo la geometria in proiezione geografica per calcolare l'area in m²
+                // ST_Area(geom::geography) ≈ NTS: usare il metodo Area con conversione approssimata
+                // 1 grado ≈ 111_320 m → Area_m² ≈ NTS.Area * (111320²) (approssimazione planare sufficiente per filtro UI)
+                const double deg2m2 = 111320.0 * 111320.0;
+                polygons = polygons
+                    .Where(p => p.Geom != null && p.Geom.Area * deg2m2 >= minArea.Value)
+                    .ToList();
+            }
+
             var features = GeoJsonFormatter.ToFeatureCollection(polygons, 
                 p => p.Geom, 
-                p => new Dictionary<string, object> { { "id", p.Id }, { "name", p.Name ?? "" }, { "population", p.Population } });
+                p => new Dictionary<string, object> 
+                { 
+                    { "id", p.Id }, 
+                    { "name", p.Name ?? "" }, 
+                    { "population", p.Population },
+                    // Espone anche riskLevel come alias semantico per il frontend
+                    { "riskLevel", p.Population }
+                });
 
             var geoJson = GeoJsonFormatter.Format(features);
             return Content(geoJson, "application/json");
@@ -106,7 +127,7 @@ namespace it.gis_landslide_detection.web.Controllers
             return Content(geoJson, "application/json");
         }
 
-        // POST: api/GisData/points/within (Spatial query)
+        // POST: api/GisData/points/within (Spatial query — punti all'interno di un'area)
         [HttpPost("points/within")]
         public async Task<IActionResult> GetPointsWithin([FromBody] PolygonDto areaDto)
         {
@@ -133,7 +154,38 @@ namespace it.gis_landslide_detection.web.Controllers
             return Content(geoJson, "application/json");
         }
 
-        // GET: api/GisData/route (Dijkstra Routing)
+        // POST: api/GisData/intersections (Spatial query — sentieri che intersecano un'area disegnata)
+        [HttpPost("intersections")]
+        public async Task<IActionResult> GetIntersectingTrails([FromBody] PolygonDto areaDto)
+        {
+            if (areaDto.Coordinates == null || areaDto.Coordinates.Count < 3)
+            {
+                return BadRequest("Geometria del poligono non valida.");
+            }
+
+            var shell = areaDto.Coordinates.Select(c => new Coordinate(c[0], c[1])).ToArray();
+            var searchPolygon = _geometryFactory.CreatePolygon(shell);
+
+            // Trova tutti i sentieri (e opzionalmente fiumi/torrenti) che intersecano l'area
+            var linesQuery = _context.GisLines.Where(l => l.Geom != null && l.Geom.Intersects(searchPolygon));
+            
+            // Se specificato un tipo, filtra anche per tipo
+            if (!string.IsNullOrEmpty(areaDto.Type) && areaDto.Type != "Mostra tutto")
+            {
+                linesQuery = linesQuery.Where(l => l.Type == areaDto.Type);
+            }
+
+            var lines = await linesQuery.ToListAsync();
+
+            var features = GeoJsonFormatter.ToFeatureCollection(lines, 
+                l => l.Geom, 
+                l => new Dictionary<string, object> { { "id", l.Id }, { "name", l.Name ?? "" }, { "type", l.Type ?? "" } });
+
+            var geoJson = GeoJsonFormatter.Format(features);
+            return Content(geoJson, "application/json");
+        }
+
+        // GET: api/GisData/route (Dijkstra Routing su sentieri)
         [HttpGet("route")]
         public async Task<IActionResult> GetRoute([FromQuery] double startLat, [FromQuery] double startLng, [FromQuery] double endLat, [FromQuery] double endLng)
         {
@@ -150,7 +202,7 @@ namespace it.gis_landslide_detection.web.Controllers
                 g => g, 
                 g => new Dictionary<string, object> 
                 { 
-                    { "name", "Shortest Path" }, 
+                    { "name", "Percorso più breve" }, 
                     { "length_deg", result.Path.Length },
                     { "snappedStartLat", result.SnappedStart!.Y },
                     { "snappedStartLng", result.SnappedStart!.X },
@@ -188,7 +240,7 @@ namespace it.gis_landslide_detection.web.Controllers
             return Ok(new { id = point.Id, message = "Punto aggiunto correttamente!" });
         }
 
-        // PUT: api/GisData/points/{id} (Editing della posizione o dei metadati)
+        // PUT: api/GisData/points/{id}
         [HttpPut("points/{id}")]
         public async Task<ActionResult> UpdatePoint(long id, [FromBody] PointDto dto)
         {
@@ -235,7 +287,8 @@ namespace it.gis_landslide_detection.web.Controllers
             _context.GisLines.Add(line);
             await _context.SaveChangesAsync();
 
-            if (line.Type == "Road")
+            // Aggiorna topologia di routing quando si aggiunge un sentiero
+            if (line.Type == "Sentiero")
             {
                 try { await _context.Database.ExecuteSqlRawAsync("SELECT refresh_routing_topology();"); } catch { }
             }
@@ -243,7 +296,7 @@ namespace it.gis_landslide_detection.web.Controllers
             return Ok(new { id = line.Id, message = "Linea creata correttamente!" });
         }
 
-        // PUT: api/GisData/lines/{id} (Editing dei vertici della linea)
+        // PUT: api/GisData/lines/{id}
         [HttpPut("lines/{id}")]
         public async Task<ActionResult> UpdateLine(long id, [FromBody] LineDto dto)
         {
@@ -262,7 +315,7 @@ namespace it.gis_landslide_detection.web.Controllers
 
             await _context.SaveChangesAsync();
             
-            if (line.Type == "Road" || dto.Type == "Road")
+            if (line.Type == "Sentiero" || dto.Type == "Sentiero")
             {
                 try { await _context.Database.ExecuteSqlRawAsync("SELECT refresh_routing_topology();"); } catch { }
             }
@@ -277,10 +330,11 @@ namespace it.gis_landslide_detection.web.Controllers
             var line = await _context.GisLines.FindAsync(id);
             if (line == null) return NotFound();
 
+            var isSentiero = line.Type == "Sentiero";
             _context.GisLines.Remove(line);
             await _context.SaveChangesAsync();
 
-            if (line.Type == "Road")
+            if (isSentiero)
             {
                 try { await _context.Database.ExecuteSqlRawAsync("SELECT refresh_routing_topology();"); } catch { }
             }
@@ -301,7 +355,7 @@ namespace it.gis_landslide_detection.web.Controllers
             var polygon = new GisPolygon
             {
                 Name = dto.Name,
-                Population = dto.Population,
+                Population = dto.Population, // Population = RiskLevel (0-100)
                 Geom = _geometryFactory.CreatePolygon(coords)
             };
 
@@ -311,7 +365,7 @@ namespace it.gis_landslide_detection.web.Controllers
             return Ok(new { id = polygon.Id, message = "Poligono creato correttamente!" });
         }
 
-        // PUT: api/GisData/polygons/{id} (Editing della forma del poligono)
+        // PUT: api/GisData/polygons/{id}
         [HttpPut("polygons/{id}")]
         public async Task<ActionResult> UpdatePolygon(long id, [FromBody] PolygonDto dto)
         {
@@ -325,7 +379,7 @@ namespace it.gis_landslide_detection.web.Controllers
 
             var coords = dto.Coordinates.Select(c => new Coordinate(c[0], c[1])).ToArray();
             polygon.Name = dto.Name;
-            polygon.Population = dto.Population;
+            polygon.Population = dto.Population; // Population = RiskLevel (0-100)
             polygon.Geom = _geometryFactory.CreatePolygon(coords);
 
             await _context.SaveChangesAsync();
@@ -368,7 +422,7 @@ namespace it.gis_landslide_detection.web.Controllers
     {
         public string? Name { get; set; }
         public string? Type { get; set; }
-        public int Population { get; set; }
-        public List<double[]> Coordinates { get; set; } = new(); // [[lng, lat], [lng, lat], ... , [lng, lat]] (il primo e l'ultimo elemento devono coincidere)
+        public int Population { get; set; } // Population = RiskLevel (0-100) per i poligoni
+        public List<double[]> Coordinates { get; set; } = new(); // [[lng, lat], ..., [lng, lat]] (il primo e l'ultimo elemento devono coincidere)
     }
 }

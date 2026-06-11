@@ -1,7 +1,8 @@
 import { state } from './state.js';
 
 export function initMap(onMapClick, onDrawCreated) {
-    state.map = L.map('map', { zoomControl: false }).setView([43.1, 13.4], 12);
+    // Centro mappa: Camerino / area Sibillini
+    state.map = L.map('map', { zoomControl: false }).setView([43.095, 13.075], 12);
     L.control.zoom({ position: 'topleft' }).addTo(state.map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(state.map);
 
@@ -20,13 +21,20 @@ export function initMap(onMapClick, onDrawCreated) {
         rotateMode: false });
 }
 
-export function choroplethStyle(pop) {
-    let fillColor = '#1e3a5f';
-    if (pop > 30000) fillColor = '#ff4060';
-    else if (pop > 15000) fillColor = '#ff8c00';
-    else if (pop > 5000) fillColor = '#ffea00';
-    else fillColor = '#10ffb0';
-    return { fillColor, color: '#0f172a', weight: 2, fillOpacity: 0.45 };
+/**
+ * Stile coropletico per zone di rischio frana (indice 0-100, scala IFFI).
+ * Critico ≥ 75: rosso (#ff4060) — es. Colamento rapido (100)
+ * Alto   ≥ 50: arancione (#ff8c00) — es. Crollo/Ribaltamento (80)
+ * Medio  ≥ 25: giallo (#ffea00) — es. Scivolamento (60) / Complesso (40)
+ * Basso   < 25: verde (#10ffb0) — Bassa pericolosità (20)
+ */
+export function choroplethStyle(riskLevel) {
+    let fillColor;
+    if (riskLevel >= 75)      fillColor = '#ff4060'; // Critico
+    else if (riskLevel >= 50) fillColor = '#ff8c00'; // Alto
+    else if (riskLevel >= 25) fillColor = '#ffea00'; // Medio
+    else                      fillColor = '#10ffb0'; // Basso
+    return { fillColor, color: '#0f172a', weight: 2, fillOpacity: 0.50 };
 }
 
 export function makePopup(type, props) {
@@ -47,9 +55,17 @@ export function makePopup(type, props) {
     `;
 
     if (type === 'polygon') {
-        return `<div style="${style}"><b>${props.name || 'N/A'}</b><br/>Pop: ${(props.population || 0).toLocaleString()}${deleteBtn}</div>`;
+        const riskLevel = props.riskLevel ?? props.population ?? 0;
+        const riskLabel = riskLevel >= 75 ? '🔴 Critico' : riskLevel >= 50 ? '🟠 Alto' : riskLevel >= 25 ? '🟡 Medio' : '🟢 Basso';
+        return `<div style="${style}"><b>${props.name || 'N/A'}</b><br/>Rischio: <b>${riskLevel}/100</b> — ${riskLabel}${deleteBtn}</div>`;
     }
-    return `<div style="${style}"><b>${props.name || 'N/A'}</b><br/>Tipo: ${props.type || '—'}${deleteBtn}</div>`;
+    if (type === 'line') {
+        const typeIcon = props.type === 'Sentiero' ? '🥾' : props.type === 'Torrente' ? '🌊' : props.type === 'Fiume' ? '🏞️' : '📏';
+        return `<div style="${style}"><b>${props.name || 'N/A'}</b><br/>${typeIcon} ${props.type || '—'}${deleteBtn}</div>`;
+    }
+    // point
+    const typeIcon = props.type === 'Baita' ? '🏔️' : props.type === 'PuntoRistoro' ? '☕' : '📍';
+    return `<div style="${style}"><b>${props.name || 'N/A'}</b><br/>${typeIcon} ${props.type || '—'}${deleteBtn}</div>`;
 }
 
 export function clearMode() {
@@ -63,13 +79,14 @@ export function clearMode() {
     if (state.routeLayer) { state.map.removeLayer(state.routeLayer); state.routeLayer = null; }
     if (state.nearestLayer) { state.map.removeLayer(state.nearestLayer); state.nearestLayer = null; }
     if (state.withinLayer) { state.map.removeLayer(state.withinLayer); state.withinLayer = null; }
+    if (state.intersectionLayer) { state.map.removeLayer(state.intersectionLayer); state.intersectionLayer = null; }
     if (state.searchAreaLayer) { state.map.removeLayer(state.searchAreaLayer); state.searchAreaLayer = null; }
     state.map.pm.disableDraw();
     
     const rs = document.getElementById('routing-status');
     if (rs) rs.classList.remove('active');
     
-    document.querySelectorAll('#btn-nearest,#btn-within,#btn-route').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#btn-nearest,#btn-within,#btn-route,#btn-intersection').forEach(b => b.classList.remove('active'));
 }
 
 export function zoomToFeature(id, type) {

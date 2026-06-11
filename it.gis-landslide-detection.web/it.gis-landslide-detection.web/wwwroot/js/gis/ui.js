@@ -41,10 +41,13 @@ export function renderFeatureList(state) {
             let icon = '⬡';
             if (geomType === 'point') {
                 const pType = p.type || p.Type;
-                icon = pType === 'Restaurant' ? '🍕' : pType === 'School' ? '🏫' : '📍';
+                icon = pType === 'Baita' ? '🏔️' : pType === 'PuntoRistoro' ? '☕' : '📍';
             } else if (geomType === 'line') {
                 const lType = p.type || p.Type;
-                icon = lType === 'River' ? '🌊' : lType === 'Road' ? '🛤️' : '📏';
+                icon = lType === 'Sentiero' ? '🥾' : lType === 'Torrente' ? '🌊' : lType === 'Fiume' ? '🏞️' : '📏';
+            } else if (geomType === 'polygon') {
+                const risk = p.riskLevel ?? p.population ?? 0;
+                icon = risk >= 75 ? '🔴' : risk >= 50 ? '🟠' : risk >= 25 ? '🟡' : '🟢';
             }
             
             const svgTrashIcon = `
@@ -77,11 +80,13 @@ export function renderFeatureList(state) {
 export function renderLegend() {
     const el = document.getElementById('legend-items');
     if (!el) return;
+    // Scala IFFI: ColamentoRapido=100 (Critico), CrolloRibaltamento=80 (Alto),
+    //             Scivolamento=60/Complesso=40 (Medio), Bassa=20 (Basso)
     const items = [
-        { color: '#10ffb0', label: '< 5.000' },
-        { color: '#ffea00', label: '5.000 – 15.000' },
-        { color: '#ff8c00', label: '15.000 – 30.000' },
-        { color: '#ff4060', label: '> 30.000' }
+        { color: '#10ffb0', label: 'Basso (< 25)' },
+        { color: '#ffea00', label: 'Medio (25 – 50)' },
+        { color: '#ff8c00', label: 'Alto (50 – 75)' },
+        { color: '#ff4060', label: 'Critico (> 75)' }
     ];
     el.innerHTML = items.map(i =>
         `<div class="legend-item"><div class="legend-swatch" style="background:${i.color}"></div>${i.label}</div>`

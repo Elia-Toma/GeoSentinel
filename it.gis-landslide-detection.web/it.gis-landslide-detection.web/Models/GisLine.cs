@@ -13,7 +13,7 @@ namespace it.gis_landslide_detection.web.Models
         public string? Name { get; set; }
 
         [Column("type")]
-        public string? Type { get; set; } // e.g. "River", "Road"
+        public string? Type { get; set; } // e.g. "Sentiero", "Torrente", "Fiume"
 
         [Column("geom", TypeName = "geometry")]
         public Geometry? Geom { get; set; }

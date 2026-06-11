@@ -1,15 +1,15 @@
 @{
-    ViewData["Title"] = "GIS Data Explorer";
+    ViewData["Title"] = "GeoSentinel Explorer";
     Layout = "~/Views/Shared/_GisLayout.cshtml";
 }
 
 <!-- ═══ MAP ═══ -->
-<main id="map" role="application" aria-label="Mappa GIS"></main>
+<main id="map" role="application" aria-label="Mappa GIS GeoSentinel"></main>
 
 <!-- ═══ TOP BAR ═══ -->
 <header id="topbar" role="banner">
     <div class="topbar-left">
-        <div class="logo-text">Geo<span>Data</span></div>
+        <div class="logo-text">Geo<span>Sentinel</span></div>
         <div class="topbar-divider"></div>
         <div class="topbar-tagline">GIS DATA EXPLORER</div>
     </div>
@@ -31,8 +31,8 @@
 <!-- ═══ SIDE PANEL ═══ -->
 <aside id="gis-panel">
     <div class="panel-header">
-        <div class="panel-title">Pannello Dati GIS</div>
-        <div class="panel-subtitle" id="panel-subtitle">Layer, Filtri e CRUD</div>
+        <div class="panel-title">GeoSentinel Explorer</div>
+        <div class="panel-subtitle" id="panel-subtitle">Sentieri · Zone Rischio · CRUD</div>
     </div>
 
     <!-- Layer Toggles -->
@@ -41,15 +41,15 @@
         <div class="layer-toggles">
             <div class="layer-toggle active" data-layer="points" onclick="GIS.toggleLayer('points', this)">
                 <div class="layer-dot" style="background: var(--accent);"></div>
-                Punti
+                🏔️ Punti
             </div>
             <div class="layer-toggle active" data-layer="lines" onclick="GIS.toggleLayer('lines', this)">
-                <div class="layer-dot" style="background: linear-gradient(135deg, #0284c7 50%, #f59e0b 50%);"></div>
-                Linee
+                <div class="layer-dot" style="background: linear-gradient(135deg, #0284c7 50%, #a16207 50%);"></div>
+                🥾 Linee
             </div>
             <div class="layer-toggle active" data-layer="polygons" onclick="GIS.toggleLayer('polygons', this)">
                 <div class="layer-dot" style="background: var(--neon-high);"></div>
-                Poligoni
+                ⚠️ Zone Rischio
             </div>
         </div>
 
@@ -57,11 +57,20 @@
         <div class="control-row">
             <select id="filter-type" class="gis-select" onchange="GIS.applyFilter()">
                 <option value="">Mostra tutto</option>
-                <option value="Restaurant">🍕 Ristoranti</option>
-                <option value="School">🏫 Scuole</option>
-                <option value="Road">🛤️ Strade</option>
-                <option value="River">🌊 Fiumi</option>
+                <option value="Baita">🏔️ Baite</option>
+                <option value="PuntoRistoro">☕ Punti Ristoro</option>
+                <option value="Sentiero">🥾 Sentieri</option>
+                <option value="Torrente">🌊 Torrenti</option>
+                <option value="Fiume">🏞️ Fiumi</option>
             </select>
+        </div>
+
+        <div class="section-label" style="margin-top: 8px;">Superficie min. zone (m²)</div>
+        <div class="control-row" style="gap: 6px;">
+            <input type="number" id="filter-min-area" class="gis-select" placeholder="es. 1000000"
+                   min="0" step="100000" style="flex:1; font-size:0.78rem;"
+                   title="Filtra zone di rischio per superficie minima in m²" />
+            <button class="gis-btn" style="flex:0 0 auto; padding: 5px 10px;" onclick="GIS.applyAreaFilter()" title="Applica filtro superficie">🔍</button>
         </div>
     </div>
 
@@ -69,14 +78,17 @@
     <div class="panel-controls">
         <div class="section-label">Strumenti</div>
         <div class="control-row">
-            <button class="gis-btn" onclick="GIS.startDrawPoint()" title="Disegna un nuovo punto">📍 Punto</button>
-            <button class="gis-btn" onclick="GIS.startDrawLine()" title="Disegna una nuova linea">📏 Linea</button>
-            <button class="gis-btn" onclick="GIS.startDrawPolygon()" title="Disegna un nuovo poligono">⬡ Poligono</button>
+            <button class="gis-btn" onclick="GIS.startDrawPoint()" title="Aggiungi baita o punto ristoro">🏔️ Punto</button>
+            <button class="gis-btn" onclick="GIS.startDrawLine()" title="Disegna un sentiero o corso d'acqua">🥾 Linea</button>
+            <button class="gis-btn" onclick="GIS.startDrawPolygon()" title="Disegna una zona di rischio frana">⚠️ Zona</button>
         </div>
         <div class="control-row">
-            <button class="gis-btn" id="btn-nearest" onclick="GIS.toggleNearest()" title="Clicca sulla mappa per trovare i punti più vicini">🎯 Nearest</button>
-            <button class="gis-btn" id="btn-within" onclick="GIS.toggleWithin()" title="Disegna un'area per cercare i punti al suo interno">🔲 Within</button>
-            <button class="gis-btn" id="btn-route" onclick="GIS.toggleRoute()" title="Clicca due punti per calcolare il percorso">🧭 Route</button>
+            <button class="gis-btn" id="btn-nearest" onclick="GIS.toggleNearest()" title="Clicca sulla mappa per trovare i 5 punti più vicini">🎯 Nearest</button>
+            <button class="gis-btn" id="btn-within" onclick="GIS.toggleWithin()" title="Disegna un'area per trovare i punti al suo interno">🔲 Within</button>
+            <button class="gis-btn" id="btn-intersection" onclick="GIS.toggleIntersection()" title="Disegna un'area per trovare i sentieri che la intersecano">🔀 Intersez.</button>
+        </div>
+        <div class="control-row">
+            <button class="gis-btn" id="btn-route" onclick="GIS.toggleRoute()" title="Calcola il percorso più breve tra due punti sui sentieri">🧭 Route</button>
         </div>
     </div>
 
@@ -100,7 +112,7 @@
                 <div class="card-value" id="stat-lines">0</div>
             </div>
             <div class="data-card card-accent-orange" style="flex:1;">
-                <div class="card-label">Poligoni</div>
+                <div class="card-label">Zone</div>
                 <div class="card-value" id="stat-polygons">0</div>
             </div>
         </div>
@@ -112,9 +124,9 @@
     </div>
 </aside>
 
-<!-- ═══ LEGEND (per la coropletica) ═══ -->
+<!-- ═══ LEGEND (Rischio Frana) ═══ -->
 <div class="legend-box shifted" id="legend-box">
-    <div class="legend-title">Popolazione Comuni</div>
+    <div class="legend-title">Rischio Frana</div>
     <div id="legend-items">
         <!-- Popolato dinamicamente -->
     </div>
@@ -152,6 +164,7 @@
   transition: border-color 0.2s; box-sizing: border-box;
 }
 .custom-modal-input:focus { border-color: #38bdf8; }
+select.custom-modal-input option { background: #1e293b; color: #f1f5f9; }
 .custom-modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
 .custom-modal-btn {
   padding: 8px 16px; border-radius: 6px; font-size: 0.85rem;

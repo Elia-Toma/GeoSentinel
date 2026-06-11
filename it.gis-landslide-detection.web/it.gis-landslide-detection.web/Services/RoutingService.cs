@@ -77,7 +77,7 @@ namespace it.gis_landslide_detection.web.Services
                 WITH closest_edge AS (
                     SELECT id, source, target, geom
                     FROM gis_lines
-                    WHERE type = 'Road' AND geom IS NOT NULL AND source IS NOT NULL AND target IS NOT NULL
+                    WHERE type = 'Sentiero' AND geom IS NOT NULL AND source IS NOT NULL AND target IS NOT NULL
                     ORDER BY geom <-> ST_SetSRID(ST_MakePoint(@lng, @lat), 4326)
                     LIMIT 1
                 ),
@@ -136,7 +136,7 @@ namespace it.gis_landslide_detection.web.Services
                 WITH dijkstra_path AS (
                     SELECT g.geom
                     FROM pgr_dijkstra(
-                        'SELECT id, source, target, cost, reverse_cost FROM gis_lines WHERE type = ''Road'' AND geom IS NOT NULL AND source IS NOT NULL',
+                        'SELECT id, source, target, cost, reverse_cost FROM gis_lines WHERE type = ''Sentiero'' AND geom IS NOT NULL AND source IS NOT NULL',
                         @startNode,
                         @endNode,
                         directed := false

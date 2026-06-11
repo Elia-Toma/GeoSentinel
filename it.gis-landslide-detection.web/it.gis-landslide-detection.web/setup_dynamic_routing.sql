@@ -8,7 +8,7 @@ ALTER TABLE gis_lines ADD COLUMN IF NOT EXISTS cost double precision;
 ALTER TABLE gis_lines ADD COLUMN IF NOT EXISTS reverse_cost double precision;
 
 -- 3. Funzione per ricalcolare tutta la topologia e i costi
--- Questa funzione deve essere chiamata quando vengono aggiunte o rimosse strade.
+-- Questa funzione viene chiamata automaticamente quando vengono aggiunti, modificati o rimossi sentieri.
 CREATE OR REPLACE FUNCTION refresh_routing_topology()
 RETURNS void AS $$
 BEGIN
@@ -16,7 +16,7 @@ BEGIN
     UPDATE gis_lines 
     SET cost = ST_Length(geom::geography),
         reverse_cost = ST_Length(geom::geography)
-    WHERE type = 'Road' AND geom IS NOT NULL;
+    WHERE type = 'Sentiero' AND geom IS NOT NULL;
 
     -- Crea la topologia (crea la tabella gis_lines_vertices_pgr con i nodi/incroci)
     -- Tolleranza: 0.00001 gradi (circa 1 metro)
@@ -27,7 +27,7 @@ BEGIN
         'id', 
         'source', 
         'target', 
-        rows_where := 'type = ''Road'' AND geom IS NOT NULL',
+        rows_where := 'type = ''Sentiero'' AND geom IS NOT NULL',
         clean := true
     );
 END;
