@@ -71,7 +71,13 @@ namespace it.gis_landslide_detection.web.Controllers
         // GET: api/GisData/polygons
         // minArea: superficie minima in m² (filtro spaziale su ST_Area)
         [HttpGet("polygons")]
-        public async Task<IActionResult> GetPolygons([FromQuery] int? minPopulation, [FromQuery] double? minArea)
+        public async Task<IActionResult> GetPolygons(
+            [FromQuery] int? minPopulation, 
+            [FromQuery] double? minArea,
+            [FromQuery] double? minLat,
+            [FromQuery] double? minLng,
+            [FromQuery] double? maxLat,
+            [FromQuery] double? maxLng)
         {
             var query = _context.GisPolygons.AsQueryable();
             if (minPopulation.HasValue)
@@ -79,19 +85,30 @@ namespace it.gis_landslide_detection.web.Controllers
                 query = query.Where(p => p.Population >= minPopulation.Value);
             }
 
-            var polygons = await query.ToListAsync();
+            // 1. Filtro spaziale Bounding Box (database-side)
+            if (minLat.HasValue && minLng.HasValue && maxLat.HasValue && maxLng.HasValue)
+            {
+                var bbox = new Envelope(minLng.Value, maxLng.Value, minLat.Value, maxLat.Value);
+                var searchArea = _geometryFactory.ToGeometry(bbox);
+                query = query.Where(p => p.Geom != null && p.Geom.Intersects(searchArea));
+            }
+            else
+            {
+                // Limita di default all'area di studio (Camerino / Sibillini) per evitare di caricare 30k+ poligoni
+                var bbox = new Envelope(12.9, 13.3, 42.9, 43.2);
+                var searchArea = _geometryFactory.ToGeometry(bbox);
+                query = query.Where(p => p.Geom != null && p.Geom.Intersects(searchArea));
+            }
 
-            // Filtro per superficie: ST_Area via NTS lato C# (già in RAM dopo la query)
+            // 2. Filtro per superficie (database-side)
             if (minArea.HasValue && minArea.Value > 0)
             {
-                // Convertiamo la geometria in proiezione geografica per calcolare l'area in m²
-                // ST_Area(geom::geography) ≈ NTS: usare il metodo Area con conversione approssimata
-                // 1 grado ≈ 111_320 m → Area_m² ≈ NTS.Area * (111320²) (approssimazione planare sufficiente per filtro UI)
-                const double deg2m2 = 111320.0 * 111320.0;
-                polygons = polygons
-                    .Where(p => p.Geom != null && p.Geom.Area * deg2m2 >= minArea.Value)
-                    .ToList();
+                // Approssimazione: 1 grado ≈ 111320 m
+                double minAreaDeg2 = minArea.Value / (111320.0 * 111320.0);
+                query = query.Where(p => p.Geom != null && p.Geom.Area >= minAreaDeg2);
             }
+
+            var polygons = await query.ToListAsync();
 
             var features = GeoJsonFormatter.ToFeatureCollection(polygons, 
                 p => p.Geom, 

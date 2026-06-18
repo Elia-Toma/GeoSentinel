@@ -48,7 +48,6 @@ function renderLayers() {
                 const fid = f.id || p.id;
                 layer.bindPopup(makePopup('point', { ...p, id: fid }));
                 layer.on('click', () => highlightFeature(fid, 'point'));
-                if (layer.pm) layer.pm.enable({ draggable: true });
                 layer.on('pm:dragend', () => onPointDragged(layer, fid));
             }
         }).addTo(m);
@@ -70,7 +69,21 @@ function renderLayers() {
             onEachFeature: (f, layer) => {
                 const p = f.properties;
                 const fid = f.id || p.id;
-                layer.bindPopup(makePopup('line', { ...p, id: fid }));
+                const type = p.type || p.Type;
+
+                if (type === 'Sentiero') {
+                    layer.bindPopup((lyr) => {
+                        const popupId = `popup-sentiero-${fid}`;
+                        setTimeout(() => fetchSentieroDanger(layer, fid, popupId), 10);
+                        return `<div id="${popupId}" data-name="${p.name || ''}" style="width:250px; font-family:'DM Mono', monospace; font-size:11px; color:#cbd5e1;">
+                                  <strong>${p.name || 'Sentiero'}</strong><br/>
+                                  <span style="color:#64748b;">Analisi pericolo frana in corso... 🔄</span>
+                                </div>`;
+                    });
+                } else {
+                    layer.bindPopup(makePopup('line', { ...p, id: fid }));
+                }
+
                 layer.on('click', (e) => {
                     if (state.mode === 'route') { onMapClick(e); return; }
                     highlightFeature(fid, 'line');
@@ -587,21 +600,42 @@ async function onMapClick(e) {
 }
 
 function enableEditing() {
-    ['points', 'lines', 'polygons'].forEach(k => {
-        if (state.layers[k]) {
-            state.layers[k].eachLayer(layer => {
-                if (layer.pm) layer.pm.enable({ allowSelfIntersection: false });
-            });
-        }
-    });
+    showToast('Seleziona un elemento sulla mappa o dalla lista per modificarlo', 'info');
+}
+
+function startEditingLayer(layer) {
+    if (state.currentlyEditingLayer && state.currentlyEditingLayer !== layer) {
+        try { state.currentlyEditingLayer.pm.disable(); } catch(err){}
+    }
+    state.currentlyEditingLayer = layer;
+    if (layer.pm) {
+        layer.pm.enable({
+            allowSelfIntersection: false,
+            draggable: true
+        });
+        showToast('Modifica abilitata. Trascina i nodi per cambiare la forma/posizione.', 'success');
+    }
 }
 
 // ─── INITIALIZATION ───
 initMap(onMapClick, onDrawCreated);
-initClock();
-loadAll().then(() => {
-    if (state.isEditMode) setTimeout(enableEditing, 500);
+
+// Gestione Modifica Dati On-Demand (Evita crash di performance con migliaia di record)
+state.currentlyEditingLayer = null;
+state.map.on('popupopen', (e) => {
+    if (state.isEditMode && e.popup && e.popup._source) {
+        startEditingLayer(e.popup._source);
+    }
 });
+state.map.on('popupclose', (e) => {
+    if (state.currentlyEditingLayer) {
+        try { state.currentlyEditingLayer.pm.disable(); } catch(err){}
+        state.currentlyEditingLayer = null;
+    }
+});
+
+initClock();
+loadAll();
 
 function toggleEditMode() {
     state.isEditMode = !state.isEditMode;
@@ -614,6 +648,70 @@ function toggleEditMode() {
         if (btn) { btn.textContent = '✏️ Modifica Dati: OFF'; btn.classList.remove('active'); }
         disableEditing();
         showToast('Modalità modifica disattivata', 'info');
+    }
+}
+
+async function fetchSentieroDanger(layer, id, popupId) {
+    const el = document.getElementById(popupId);
+    if (!el) return;
+
+    try {
+        const center = layer.getBounds().getCenter();
+        const data = await apiFetch(`/api/Landslide?lat=${center.lat}&lng=${center.lng}`);
+        
+        let riskColor;
+        let riskLabel;
+        if (data.hazardLevel === 'CRITICAL') {
+            riskColor = 'var(--neon-crit)';
+            riskLabel = '🔴 CRITICO';
+        } else if (data.hazardLevel === 'HIGH') {
+            riskColor = 'var(--neon-high)';
+            riskLabel = '🟠 ALTO';
+        } else if (data.hazardLevel === 'MEDIUM') {
+            riskColor = 'var(--neon-warn)';
+            riskLabel = '🟡 MEDIO';
+        } else {
+            riskColor = 'var(--neon-safe)';
+            riskLabel = '🟢 BASSO';
+        }
+
+        const deleteBtn = `
+          <div style="margin-top:10px;border-top:1px solid rgba(148,163,184,0.12);padding-top:8px;display:flex;justify-content:flex-end;">
+            <button onclick="event.stopPropagation();GIS.deleteFeature(${id},'line')" 
+                    title="Elimina sentiero" 
+                    style="background:none;border:none;color:#ff4060;cursor:pointer;padding:2px 4px;font-size:10px;display:flex;align-items:center;gap:4px;font-family:inherit;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:#ff4060;">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Elimina Sentiero
+            </button>
+          </div>
+        `;
+
+        el.innerHTML = `
+          <div style="font-family:'Syne', sans-serif; font-weight:700; font-size:13px; color:#f8fafc; margin-bottom:6px; border-bottom:1px solid rgba(148,163,184,0.12); padding-bottom:4px;">
+            🥾 ${el.dataset.name || 'Sentiero'}
+          </div>
+          <div style="margin-bottom:8px;">
+            Stato Pericolo: <strong style="color:${riskColor};">${riskLabel}</strong> (${data.hazardScore}/100)
+          </div>
+          <div style="font-size:10px; color:#94a3b8; display:grid; grid-template-columns: 1fr 1fr; gap:6px; background:rgba(255,255,255,0.03); border:1px solid rgba(148,163,184,0.08); border-radius:6px; padding:6px; margin-bottom:8px;">
+            <div>💧 Umidità Suolo:<br/><strong style="color:#f8fafc;">${data.soilMoisture}%</strong></div>
+            <div>🌧️ Pioggia Attuale:<br/><strong style="color:#f8fafc;">${data.precipitationMmh.toFixed(1)} mm/h</strong></div>
+            <div style="grid-column: span 2;">🗺️ Catasto IFFI:<br/><strong style="color:#f8fafc;">${data.iffiLevel}</strong></div>
+          </div>
+          <div style="font-size:10px; line-height:1.4; color:#e2e8f0; background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.15); border-radius:6px; padding:6px 8px;">
+            ${data.message}
+          </div>
+          ${deleteBtn}
+        `;
+    } catch (err) {
+        console.error('Errore analisi sentiero:', err);
+        el.innerHTML = `
+          <strong>${el.dataset.name || 'Sentiero'}</strong><br/>
+          <span style="color:var(--neon-crit); font-size: 10px;">Impossibile calcolare la pericolosità in tempo reale. Verificare connessione API.</span>
+        `;
     }
 }
 

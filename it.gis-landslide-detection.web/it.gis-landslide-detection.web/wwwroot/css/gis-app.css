@@ -479,3 +479,34 @@ body::before {
     .legend-box.shifted { right: 12px; }
     .topbar-divider, .topbar-tagline, .clock-pill { display: none; }
 }
+
+/* ─── CUSTOM LEAFLET POPUP OVERRIDES (Dark Glassmorphism) ─── */
+.leaflet-popup-content-wrapper {
+    background: rgba(10, 20, 40, 0.94) !important;
+    backdrop-filter: blur(12px) saturate(1.2);
+    border: 1px solid rgba(148, 163, 184, 0.16) !important;
+    color: var(--text-base) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+.leaflet-popup-tip {
+    background: rgba(10, 20, 40, 0.94) !important;
+    border-left: 1px solid rgba(148, 163, 184, 0.16) !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.16) !important;
+    box-shadow: none !important;
+}
+.leaflet-popup-content {
+    margin: 14px 16px !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.72rem !important;
+    line-height: 1.5 !important;
+}
+.leaflet-popup-close-button {
+    color: var(--text-soft) !important;
+    padding: 6px 8px 0 0 !important;
+    font-size: 16px !important;
+}
+.leaflet-popup-close-button:hover {
+    color: var(--text-hi) !important;
+    background: transparent !important;
+}

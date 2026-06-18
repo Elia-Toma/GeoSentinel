@@ -12,6 +12,7 @@ services:
       - "5433:5432" # Mappatura sulla 5433 per evitare conflitti
     volumes:
       - gis_local_data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
     restart: unless-stopped
 
 volumes:
