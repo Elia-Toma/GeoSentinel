@@ -524,6 +524,72 @@ function toggleRoute() {
     }
 }
 
+function toggleTsp() {
+    if (state.mode === 'tsp') {
+        // Secondo click sul bottone = esegui calcolo se ci sono almeno 2 POI
+        if (state.tspPoints.length >= 2) {
+            computeTsp();
+        } else {
+            showToast('Servono almeno 2 punti per il TSP', 'error');
+            clearMode();
+        }
+        return;
+    }
+    clearMode();
+    state.mode = 'tsp';
+    state.tspPoints = [];
+    state.tspMarkers = [];
+    document.getElementById('btn-tsp').classList.add('active');
+    const rs = document.getElementById('routing-status');
+    if (rs) {
+        rs.textContent = 'TSP: clicca i POI da visitare (2-12). Riclicca 🔁 TSP per calcolare il tour.';
+        rs.classList.add('active');
+    }
+}
+
+async function computeTsp() {
+    const rs = document.getElementById('routing-status');
+    if (rs) rs.textContent = `Calcolo TSP su ${state.tspPoints.length} punti (NN + 2-opt)...`;
+    try {
+        const body = {
+            points: state.tspPoints.map(ll => [ll.lng, ll.lat]),
+            closed: true
+        };
+        const result = await apiFetch('/api/GisData/tsp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (state.tspLayer) state.map.removeLayer(state.tspLayer);
+        state.tspLayer = L.geoJSON(result, {
+            style: { color: '#ff8c00', weight: 5, opacity: 0.95, dashArray: '10,5' }
+        }).addTo(state.map);
+
+        // Etichette ordine di visita
+        const ordered = result?.properties?.orderedPoints || [];
+        ordered.forEach((p, idx) => {
+            const marker = L.marker([p[1], p[0]], {
+                icon: L.divIcon({
+                    className: 'tsp-order-label',
+                    html: `<div style="background:#ff8c00;color:#0f172a;border:2px solid #0f172a;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'DM Mono',monospace;font-size:11px;">${idx + 1}</div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                })
+            }).addTo(state.map);
+            state.tspMarkers.push(marker);
+        });
+
+        state.map.fitBounds(state.tspLayer.getBounds(), { padding: [60, 60] });
+        if (rs) rs.textContent = `Tour TSP: ${state.tspPoints.length} POI, lunghezza ${formatRouteLength(result)}`;
+        showToast('Tour TSP calcolato!', 'success');
+    } catch (err) {
+        if (rs) rs.textContent = 'TSP fallito: nessun percorso trovato';
+        showToast('Errore TSP: ' + err.message, 'error');
+    }
+    state.mode = null;
+    document.getElementById('btn-tsp').classList.remove('active');
+}
+
 function formatRouteLength(result) {
     const coords = result?.geometry?.coordinates;
     if (!coords || coords.length < 2) return '0 m';
@@ -556,6 +622,25 @@ async function onMapClick(e) {
             const count = result?.features?.length || 0;
             showToast(`${count} punti più vicini trovati!`, 'success');
         } catch (err) { showToast('Errore: ' + err.message, 'error'); }
+
+    } else if (state.mode === 'tsp') {
+        if (state.tspPoints.length >= 12) {
+            showToast('Limite 12 punti raggiunto. Riclicca 🔁 TSP per calcolare.', 'info');
+            return;
+        }
+        state.tspPoints.push(e.latlng);
+        const idx = state.tspPoints.length;
+        const marker = L.marker(e.latlng, {
+            icon: L.divIcon({
+                className: 'tsp-pick',
+                html: `<div style="background:#38bdf8;color:#0f172a;border:2px solid #0f172a;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'DM Mono',monospace;font-size:10px;">${idx}</div>`,
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+            })
+        }).addTo(state.map);
+        state.tspMarkers.push(marker);
+        const rs = document.getElementById('routing-status');
+        if (rs) rs.textContent = `TSP: ${idx} POI selezionati. Aggiungi altri o riclicca 🔁 TSP per calcolare.`;
 
     } else if (state.mode === 'route') {
         state.routePoints.push(e.latlng);
@@ -719,6 +804,6 @@ async function fetchSentieroDanger(layer, id, popupId) {
 window.GIS = {
     toggleLayer, applyFilter, applyAreaFilter,
     startDrawPoint, startDrawLine, startDrawPolygon,
-    toggleNearest, toggleWithin, toggleIntersection, toggleRoute,
+    toggleNearest, toggleWithin, toggleIntersection, toggleRoute, toggleTsp,
     deleteFeature, zoomTo: zoomToFeature, toggleEditMode
 };

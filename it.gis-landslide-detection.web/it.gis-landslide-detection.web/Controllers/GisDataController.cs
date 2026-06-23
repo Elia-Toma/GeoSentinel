@@ -17,12 +17,14 @@ namespace it.gis_landslide_detection.web.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IRoutingService _routingService;
+        private readonly ITspService _tspService;
         private readonly GeometryFactory _geometryFactory;
 
-        public GisDataController(ApplicationDbContext context, IRoutingService routingService)
+        public GisDataController(ApplicationDbContext context, IRoutingService routingService, ITspService tspService)
         {
             _context = context;
             _routingService = routingService;
+            _tspService = tspService;
             _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         }
 
@@ -53,7 +55,10 @@ namespace it.gis_landslide_detection.web.Controllers
         [HttpGet("lines")]
         public async Task<IActionResult> GetLines([FromQuery] string? type)
         {
-            var query = _context.GisLines.AsQueryable();
+            // Esclude i bridge sintetici (__BRIDGE_AUTO__) dal rendering: esistono
+            // solo nel grafo pgRouting come "scorciatoie" tra componenti isolate,
+            // ma non sono sentieri reali e non devono apparire sulla mappa.
+            var query = _context.GisLines.Where(l => l.Name != "__BRIDGE_AUTO__");
             if (!string.IsNullOrEmpty(type))
             {
                 query = query.Where(l => l.Type == type);
@@ -183,8 +188,9 @@ namespace it.gis_landslide_detection.web.Controllers
             var shell = areaDto.Coordinates.Select(c => new Coordinate(c[0], c[1])).ToArray();
             var searchPolygon = _geometryFactory.CreatePolygon(shell);
 
-            // Trova tutti i sentieri (e opzionalmente fiumi/torrenti) che intersecano l'area
-            var linesQuery = _context.GisLines.Where(l => l.Geom != null && l.Geom.Intersects(searchPolygon));
+            // Trova tutti i sentieri (e opzionalmente fiumi/torrenti) che intersecano l'area.
+            // Esclude i bridge sintetici (vedi commento in GetLines).
+            var linesQuery = _context.GisLines.Where(l => l.Geom != null && l.Name != "__BRIDGE_AUTO__" && l.Geom.Intersects(searchPolygon));
             
             // Se specificato un tipo, filtra anche per tipo
             if (!string.IsNullOrEmpty(areaDto.Type) && areaDto.Type != "Mostra tutto")
@@ -215,12 +221,14 @@ namespace it.gis_landslide_detection.web.Controllers
                 return NotFound("Nessun percorso trovato tra i punti selezionati.");
             }
 
-            var feature = GeoJsonFormatter.ToFeature(result.Path, 
-                g => g, 
-                g => new Dictionary<string, object> 
-                { 
-                    { "name", "Percorso più breve" }, 
+            var feature = GeoJsonFormatter.ToFeature(result.Path,
+                g => g,
+                g => new Dictionary<string, object>
+                {
+                    { "name", "Percorso più breve" },
                     { "length_deg", result.Path.Length },
+                    { "length_m", result.RouteDistanceM },
+                    { "used_bridge", result.UsedBridge },
                     { "snappedStartLat", result.SnappedStart!.Y },
                     { "snappedStartLng", result.SnappedStart!.X },
                     { "snappedEndLat", result.SnappedEnd!.Y },
@@ -232,6 +240,43 @@ namespace it.gis_landslide_detection.web.Controllers
                 return NotFound("Errore durante la creazione della feature geografica.");
             }
 
+            var geoJson = GeoJsonFormatter.Format(feature);
+            return Content(geoJson, "application/json");
+        }
+
+        // POST: api/GisData/tsp (Traveling Salesman — tour ottimale tra N POI)
+        [HttpPost("tsp")]
+        public async Task<IActionResult> GetTspTour([FromBody] TspRequestDto dto)
+        {
+            if (dto?.Points == null || dto.Points.Count < 2)
+            {
+                return BadRequest("Servono almeno 2 punti per il TSP.");
+            }
+            if (dto.Points.Count > 12)
+            {
+                return BadRequest("Massimo 12 punti supportati (complessità computazionale).");
+            }
+
+            var pois = dto.Points.Select(p => new Coordinate(p[0], p[1])).ToList();
+            var result = await _tspService.SolveAsync(pois, dto.Closed);
+            if (result?.FullPath == null)
+            {
+                return NotFound("Impossibile calcolare il tour TSP (nessun percorso trovato fra i POI).");
+            }
+
+            var orderedLngLat = result.OrderedPoints.Select(c => new[] { c.X, c.Y }).ToList();
+            var feature = GeoJsonFormatter.ToFeature(result.FullPath,
+                g => g,
+                g => new Dictionary<string, object>
+                {
+                    { "name", "Tour TSP" },
+                    { "length_deg", result.TotalLengthDeg },
+                    { "visitOrder", result.VisitOrder },
+                    { "orderedPoints", orderedLngLat },
+                    { "closed", dto.Closed }
+                });
+
+            if (feature == null) return NotFound("Errore creazione feature TSP.");
             var geoJson = GeoJsonFormatter.Format(feature);
             return Content(geoJson, "application/json");
         }
@@ -441,5 +486,11 @@ namespace it.gis_landslide_detection.web.Controllers
         public string? Type { get; set; }
         public int Population { get; set; } // Population = RiskLevel (0-100) per i poligoni
         public List<double[]> Coordinates { get; set; } = new(); // [[lng, lat], ..., [lng, lat]] (il primo e l'ultimo elemento devono coincidere)
+    }
+
+    public class TspRequestDto
+    {
+        public List<double[]> Points { get; set; } = new(); // [[lng, lat], ...]
+        public bool Closed { get; set; } = true; // true = tour chiuso (torna alla partenza)
     }
 }

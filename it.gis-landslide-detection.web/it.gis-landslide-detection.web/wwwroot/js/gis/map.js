@@ -87,12 +87,18 @@ export function clearMode() {
     if (state.withinLayer) { state.map.removeLayer(state.withinLayer); state.withinLayer = null; }
     if (state.intersectionLayer) { state.map.removeLayer(state.intersectionLayer); state.intersectionLayer = null; }
     if (state.searchAreaLayer) { state.map.removeLayer(state.searchAreaLayer); state.searchAreaLayer = null; }
+    if (state.tspMarkers) {
+        state.tspMarkers.forEach(m => state.map.removeLayer(m));
+        state.tspMarkers = [];
+    }
+    state.tspPoints = [];
+    if (state.tspLayer) { state.map.removeLayer(state.tspLayer); state.tspLayer = null; }
     state.map.pm.disableDraw();
-    
+
     const rs = document.getElementById('routing-status');
     if (rs) rs.classList.remove('active');
-    
-    document.querySelectorAll('#btn-nearest,#btn-within,#btn-route,#btn-intersection').forEach(b => b.classList.remove('active'));
+
+    document.querySelectorAll('#btn-nearest,#btn-within,#btn-route,#btn-intersection,#btn-tsp').forEach(b => b.classList.remove('active'));
 }
 
 export function zoomToFeature(id, type) {

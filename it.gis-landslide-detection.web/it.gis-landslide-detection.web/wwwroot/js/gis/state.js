@@ -3,7 +3,7 @@ export const state = {
     layers: { points: null, lines: null, polygons: null },
     visible: { points: true, lines: true, polygons: true },
     data: { points: [], lines: [], polygons: [] },
-    mode: null, // 'nearest' | 'within' | 'route' | 'intersection'
+    mode: null, // 'nearest' | 'within' | 'route' | 'intersection' | 'tsp'
     routePoints: [],
     routeMarkers: [],
     routeLayer: null,
@@ -11,6 +11,9 @@ export const state = {
     withinLayer: null,
     intersectionLayer: null,
     searchAreaLayer: null,
+    tspPoints: [],
+    tspMarkers: [],
+    tspLayer: null,
     drawMeta: null,
     isEditMode: false
 };
