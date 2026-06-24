@@ -1,0 +1,34 @@
+name: Mirror Upstream Repository
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Save workflow file
+        run: cp .github/workflows/mirror.yml /tmp/mirror.yml
+
+      - name: Clone upstream as mirror
+        run: |
+          git clone --mirror https://github.com/Porfus/gis-landslide-detection.git repo.git
+          cd repo.git
+          git remote set-url origin https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/${{ github.repository }}
+          git push --mirror
+
+      - name: Restore workflow file
+        run: |
+          git clone https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/${{ github.repository }} dest
+          cd dest
+          mkdir -p .github/workflows
+          cp /tmp/mirror.yml .github/workflows/mirror.yml
+          git config user.email "mirror-bot@github.com"
+          git config user.name "Mirror Bot"
+          git add .github/workflows/mirror.yml
+          git diff --cached --quiet || git commit -m "chore: restore mirror workflow"
+          git push
